@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DriftSentinel · 模型质量工作台</title>
+<style>
+/* ============================================================
+   DriftSentinel UI Prototype · 演示模式
+   BACKEND-TODO 标记说明：
+   - 数据上传、模型适配器、压力场景生成、指标计算、配置导出
+     均为前端演示数据，接入真实后端的位置见 JS 内 BACKEND-TODO 注释
+   ============================================================ */
+:root{
+  /* 浅色主题 · 冷石板蓝 + 牛仔靛蓝 */
+  --bg:#eef1f6;
+  --panel:#ffffff;
+  --panel-2:#f3f5fa;
+  --panel-3:#e7ebf3;
+  --border:#dfe4ee;
+  --border-2:#c5cede;
+  --text:#181d2b;
+  --text-2:#4c566b;
+  --text-3:#8a94a9;
+  --primary:#2952cc;
+  --primary-strong:#1e42a8;
+  --primary-soft:#e4eafb;
+  --blue:#0e7490;
+  --blue-soft:#e0f2f7;
+  --amber:#a16207;
+  --amber-soft:#fdf3dd;
+  --red:#c22f45;
+  --red-soft:#fbe7ea;
+  --green:#177a4b;
+  --green-soft:#e1f3e8;
+  --notice-amber-border:#f0dfb4;
+  --notice-blue-border:#d3e0f5;
+  --radius:6px;
+  --shadow:0 1px 2px rgba(23,29,43,.06);
+  --shadow-lg:0 8px 28px rgba(23,29,43,.16);
+  --mono:'SF Mono',Menlo,Consolas,'Cascadia Code',monospace;
+  --side-w:220px;
+}
+/* 深色主题 · 同一配色的暗色搭配 */
+body.dark{
+  --bg:#0f1318;
+  --panel:#161c23;
+  --panel-2:#1c232b;
+  --panel-3:#242e38;
+  --border:#283039;
+  --border-2:#39434f;
+  --text:#e7ebf1;
+  --text-2:#a9b2c0;
+  --text-3:#6f7a8c;
+  --primary:#6e93ff;
+  --primary-strong:#8caaff;
+  --primary-soft:#20293f;
+  --blue:#3fb6c9;
+  --blue-soft:#12272e;
+  --amber:#d9a53f;
+  --amber-soft:#2b2416;
+  --red:#e2607a;
+  --red-soft:#2e1a20;
+  --green:#3fbf7f;
+  --green-soft:#14261b;
+  --notice-amber-border:#3d3320;
+  --notice-blue-border:#1f3340;
+  --shadow:0 1px 2px rgba(0,0,0,.35);
+  --shadow-lg:0 8px 28px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font:13.5px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 布局骨架 ---------- */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:var(--side-w);flex:0 0 var(--side-w);background:var(--panel);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;
+}
+.brand{padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+.brand-row{display:flex;align-items:center;gap:9px}
+.brand-mark{width:26px;height:26px;border-radius:6px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;flex:0 0 26px}
+.brand h1{font-size:14.5px;font-weight:650;letter-spacing:-.1px}
+.brand .sub{font-size:10.5px;color:var(--text-3);margin-top:1px}
+.nav{padding:10px 8px;flex:1;overflow-y:auto}
+.nav-item{
+  display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  padding:7px 10px;border-radius:var(--radius);color:var(--text-2);font-size:13px;
+  transition:background .12s,color .12s;
+}
+.nav-item:hover{background:var(--panel-2);color:var(--text)}
+.nav-item.active{background:var(--primary-soft);color:var(--primary-strong);font-weight:600}
+.nav-item svg{flex:0 0 15px;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nav-item .badge{margin-left:auto;font-size:10px;background:var(--panel-3);color:var(--text-2);padding:1px 6px;border-radius:8px;font-family:var(--mono)}
+.side-foot{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-3);line-height:1.55}
+.side-foot .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;vertical-align:1px}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{
+  background:var(--panel);border-bottom:1px solid var(--border);
+  padding:0 24px;height:54px;display:flex;align-items:center;gap:14px;
+  position:sticky;top:0;z-index:40;
+}
+.crumb{font-size:12.5px;color:var(--text-3);display:flex;align-items:center;gap:6px}
+.crumb b{color:var(--text);font-weight:600}
+.crumb .sep{color:var(--border-2)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.status-chip{
+  display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:4px 10px;border-radius:14px;white-space:nowrap;
+}
+.status-chip .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.st-done{background:var(--green-soft);color:var(--green)}
+.st-stale{background:var(--amber-soft);color:var(--amber)}
+.st-loading{background:var(--blue-soft);color:var(--blue)}
+.st-error{background:var(--red-soft);color:var(--red)}
+.local-badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2);border:1px solid var(--border);padding:4px 10px;border-radius:14px;background:var(--panel-2)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.content{padding:22px 24px 70px;max-width:1440px;width:100%;margin:0 auto}
+
+/* ---------- 通用组件 ---------- */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel-head{
+  padding:13px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.panel-head h3{font-size:13px;font-weight:650;display:flex;align-items:center;gap:7px}
+.panel-head h3 svg{width:14px;height:14px;stroke:var(--primary);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.panel-head .sub{font-size:11px;color:var(--text-3);margin-top:1px;font-weight:400}
+.panel-body{padding:14px 16px}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:var(--radius);
+  font-size:12.5px;font-weight:550;border:1px solid var(--border-2);background:var(--panel);
+  transition:.12s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--text-3);background:var(--panel-2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-strong);border-color:var(--primary-strong)}
+.btn.small{padding:4px 10px;font-size:11.5px}
+.btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn .spin{animation:spin 0.9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.t-ok{background:var(--green-soft);color:var(--green)}
+.t-warn{background:var(--amber-soft);color:var(--amber)}
+.t-crit{background:var(--red-soft);color:var(--red)}
+.t-info{background:var(--blue-soft);color:var(--blue)}
+.t-teal{background:var(--primary-soft);color:var(--primary-strong)}
+.t-neutral{background:var(--panel-3);color:var(--text-2)}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{
+  text-align:left;padding:8px 10px;font-size:10.5px;font-weight:650;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border-2);white-space:nowrap;
+}
+td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr.clickable{cursor:pointer;transition:background .1s}
+tbody tr.clickable:hover{background:var(--panel-2)}
+.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 开关 */
+.switch{
+  position:relative;width:32px;height:18px;border-radius:10px;background:var(--border-2);
+  transition:.15s;flex:0 0 32px;
+}
+.switch:after{
+  content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2);
+}
+.switch.on{background:var(--primary)}
+.switch.on:after{left:16px}
+
+/* 滑块 */
+input[type=range]{width:100%;accent-color:var(--primary);height:16px;cursor:pointer}
+.slider-row{display:flex;align-items:center;gap:8px}
+.slider-row .sv{font-family:var(--mono);font-size:11px;color:var(--primary-strong);min-width:44px;text-align:right;flex:0 0 44px;font-weight:600}
+
+/* 摘要栏 */
+.summary-bar{
+  display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--panel);margin-bottom:16px;box-shadow:var(--shadow);overflow:hidden;
+}
+.sum-item{padding:11px 18px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border);min-width:0}
+.sum-item:last-child{border-right:none}
+.sum-item .k{font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.sum-item .v{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sum-item .v .mono{font-weight:500}
+
+/* 指标卡 */
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.metric{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;box-shadow:var(--shadow);display:flex;gap:10px;align-items:flex-start;
+}
+.metric .cdot{width:8px;height:8px;border-radius:2px;margin-top:5px;flex:0 0 8px}
+.metric .m-title{font-size:11.5px;color:var(--text-2);font-weight:600}
+.metric .m-val{font-size:20px;font-weight:650;font-family:var(--mono);letter-spacing:-.4px;line-height:1.25;margin-top:2px}
+.metric .m-sub{font-size:11px;margin-top:3px;color:var(--text-3)}
+.metric .delta{font-size:11.5px;font-weight:650;margin-top:3px}
+
+/* 提示条 */
+.notice{border-radius:var(--radius);padding:10px 13px;font-size:12px;line-height:1.6;display:flex;gap:8px}
+.notice svg{width:14px;height:14px;flex:0 0 14px;margin-top:2px;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.notice.amber{background:var(--amber-soft);color:var(--amber);border:1px solid var(--notice-amber-border)}
+.notice.amber svg{stroke:var(--amber)}
+.notice.blue{background:var(--blue-soft);color:var(--blue);border:1px solid var(--notice-blue-border)}
+.notice.blue svg{stroke:var(--blue)}
+
+/* 图例 */
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--text-2);margin-bottom:8px}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:12px;height:3px;border-radius:2px;display:block}
+.legend i.dotm{width:8px;height:8px;border-radius:50%}
+.legend i.dashl{height:0;border-top:2px dashed;width:14px}
+
+/* 图表容器 */
+.chart-box{width:100%}
+.chart-box svg{width:100%;height:auto;display:block}
+
+/* 空状态 / 加载状态 */
+.state-box{padding:34px 20px;text-align:center;color:var(--text-3)}
+.state-box .icon{width:38px;height:38px;margin:0 auto 12px;border-radius:9px;background:var(--panel-3);display:grid;place-items:center}
+.state-box .icon svg{width:19px;height:19px;stroke:var(--text-3);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.state-box h4{font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:4px}
+.state-box p{font-size:12px;max-width:44ch;margin:0 auto;line-height:1.6}
+.skeleton{padding:16px}
+.sk-line{height:11px;border-radius:4px;background:var(--panel-3);margin-bottom:10px;animation:pulse 1.2s ease-in-out infinite}
+.sk-line.short{width:56%}
+.sk-chart{height:200px;border-radius:var(--radius);background:var(--panel-3);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* 进度 */
+.prog-wrap{padding:18px 20px}
+.prog-stage{display:flex;align-items:center;gap:9px;font-size:12.5px;margin-bottom:11px;color:var(--text-3)}
+.prog-stage .ic{width:16px;height:16px;display:grid;place-items:center;flex:0 0 16px}
+.prog-stage .ic .ring{width:13px;height:13px;border:2px solid var(--border-2);border-radius:50%}
+.prog-stage.done{color:var(--text-2)}
+.prog-stage.done .ring{border-color:var(--green);background:var(--green);position:relative}
+.prog-stage.done .ring:after{content:'✓';position:absolute;inset:0;color:#fff;font-size:8px;display:grid;place-items:center}
+.prog-stage.active{color:var(--primary-strong);font-weight:600}
+.prog-stage.active .ring{border-color:var(--primary);border-top-color:transparent;animation:spin .8s linear infinite}
+.prog-bar{height:4px;background:var(--panel-3);border-radius:3px;overflow:hidden;margin-top:6px}
+.prog-bar i{display:block;height:100%;background:var(--primary);border-radius:3px;transition:width .35s ease}
+
+/* ---------- 工作台布局 ---------- */
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.page-head h2{font-size:19px;font-weight:650;letter-spacing:-.2px}
+.page-head .sub{font-size:12.5px;color:var(--text-2);margin-top:3px}
+.page-head .actions{display:flex;gap:8px;flex:0 0 auto}
+
+.bench{display:grid;grid-template-columns:minmax(320px,380px) minmax(0,1fr);gap:16px;align-items:start}
+.cfg-panel .panel-body{padding:14px 16px}
+.cfg-block{padding:12px 0;border-bottom:1px dashed var(--border)}
+.cfg-block:first-child{padding-top:0}
+.cfg-block:last-child{border-bottom:none;padding-bottom:0}
+.cfg-k{font-size:10.5px;font-weight:650;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.cfg-file{
+  display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--panel-2);
+}
+.cfg-file svg{width:14px;height:14px;stroke:var(--text-3);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:0 0 14px}
+.cfg-file .name{font-family:var(--mono);font-size:12px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfg-file .meta{font-size:10.5px;color:var(--text-3);margin-top:1px}
+
+.scen{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border);align-items:flex-start}
+.scen:last-child{border-bottom:none;padding-bottom:2px}
+.scen .info{flex:1;min-width:0}
+.scen .nm{font-size:12.5px;font-weight:600}
+.scen .fl{font-size:11px;color:var(--text-3);margin-top:1px;font-family:var(--mono)}
+.scen .ctrl{margin-top:7px}
+.scen .row2{display:flex;align-items:center;gap:8px;margin-top:6px}
+.scen .hint{font-size:10.5px;color:var(--text-3)}
+.scen.disabled .nm{color:var(--text-3)}
+
+.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border)}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--text-2)}
+.kv .v{font-family:var(--mono);font-weight:550}
+
+/* 结果区 */
+.results-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.bottom-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+
+/* 抽屉 */
+.drawer-mask{
+  position:fixed;inset:0;background:rgba(18,28,24,.28);z-index:60;
+  opacity:0;pointer-events:none;transition:opacity .18s;
+}
+body.dark .drawer-mask{background:rgba(0,0,0,.55)}
+.drawer-mask.open{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(400px,92vw);background:var(--panel);
+  border-left:1px solid var(--border);z-index:61;transform:translateX(100%);
+  transition:transform .22s ease;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;
+}
+.drawer.open{transform:none}
+.drawer-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.drawer-head h3{font-size:14.5px;font-weight:650;font-family:var(--mono)}
+.drawer-head .sub{font-size:11.5px;color:var(--text-3);margin-top:4px}
+.drawer-body{padding:16px 18px;overflow-y:auto;flex:1}
+.drawer-body h4{font-size:11px;font-weight:650;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
+.drawer-body h4:first-child{margin-top:0}
+.drawer-close{width:26px;height:26px;border-radius:var(--radius);display:grid;place-items:center;color:var(--text-3)}
+.drawer-close:hover{background:var(--panel-2);color:var(--text)}
+.drawer-close svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
+
+/* 模态 */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(18,28,24,.32);z-index:70;
+  display:grid;place-items:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .16s;
+}
+body.dark .modal-mask{background:rgba(0,0,0,.6)}
+.modal-mask.open{opacity:1;pointer-events:auto}
+.modal{
+  width:min(560px,100%);background:var(--panel);border-radius:8px;box-shadow:var(--shadow-lg);
+  transform:translateY(8px);transition:transform .16s;overflow:hidden;
+}
+.modal-mask.open .modal{transform:none}
+.modal-head{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{font-size:14px;font-weight:650}
+.modal-body{padding:16px 18px}
+.fmt-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.fmt-opt{border:1.5px solid var(--border);border-radius:var(--radius);padding:11px 13px;cursor:pointer;transition:.12s;text-align:left}
+.fmt-opt:hover{border-color:var(--text-3)}
+.fmt-opt.on{border-color:var(--primary);background:var(--primary-soft)}
+.fmt-opt .f{font-family:var(--mono);font-size:12.5px;font-weight:650;color:var(--primary-strong)}
+.fmt-opt .d{font-size:11px;color:var(--text-3);margin-top:2px}
+.modal-foot{padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+pre.cfgpre{
+  background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;font-family:var(--mono);font-size:11px;line-height:1.6;
+  max-height:240px;overflow:auto;white-space:pre;color:var(--text-2);
+}
+
+/* 标签页 */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.tab{
+  padding:9px 15px;font-size:13px;color:var(--text-3);font-weight:550;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:.12s;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary-strong);border-bottom-color:var(--primary);font-weight:650}
+
+footer.mode-foot{
+  text-align:center;font-size:11px;color:var(--text-3);padding:18px 0 6px;
+}
+
+/* 移动端菜单按钮（基础规则必须写在媒体查询之前，否则 !important 覆盖） */
+.theme-btn{
+  width:28px;height:28px;border-radius:var(--radius);display:grid;place-items:center;
+  color:var(--text-2);border:1px solid var(--border);background:var(--panel-2);transition:.12s;
+}
+.theme-btn:hover{color:var(--text);border-color:var(--border-2)}
+.theme-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.menu-btn{display:none;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border-2);border-radius:var(--radius);font-size:12px}
+
+/* 响应式 */
+@media (max-width:1100px){
+  .bench{grid-template-columns:1fr}
+  .bottom-grid{grid-template-columns:1fr}
+}
+@media (max-width:820px){
+  .sidebar{position:fixed;z-index:80;transform:translateX(-100%);transition:transform .2s;box-shadow:var(--shadow-lg)}
+  .sidebar.open{transform:none}
+  .menu-btn{display:inline-flex !important}
+  .content{padding:16px 14px 60px}
+  .topbar{padding:0 14px}
+  .local-badge{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- BACKEND-TODO: 侧边栏导航路由（真实实现时接入实验/数据集/模型的持久化列表） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-row">
+        <span class="brand-mark">DS</span>
+        <div>
+          <h1>DriftSentinel</h1>
+          <div class="sub">Model quality workbench</div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div><span class="dot"></span>Local workspace</div>
+      <div style="margin-top:2px">数据仅保存在本机</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        菜单
+      </button>
+      <div class="crumb" id="crumb"></div>
+      <div class="topbar-right">
+        <span class="status-chip" id="statusChip"></span>
+        <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="切换浅色 / 深色配色" aria-label="切换配色"></button>
+        <span class="local-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>本地运行</span>
+        <span class="avatar">DS</span>
+      </div>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<!-- 字段详情抽屉 -->
+<div class="drawer-mask" id="drawerMask" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div><h3 id="drawerTitle"></h3><div class="sub" id="drawerSub"></div></div>
+    <button class="drawer-close" onclick="closeDrawer()" aria-label="关闭">
+      <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<!-- 导出格式模态 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>导出监控配置</h3>
+      <button class="drawer-close" onclick="closeModal()" aria-label="关闭">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="fmt-row">
+        <button class="fmt-opt on" data-fmt="yaml" onclick="pickFmt('yaml')">
+          <div class="f">YAML</div><div class="d">监控服务约定的主格式，可直接加载</div>
+        </button>
+        <button class="fmt-opt" data-fmt="json" onclick="pickFmt('json')">
+          <div class="f">JSON</div><div class="d">便于程序化处理与 SDK 读取</div>
+        </button>
+      </div>
+      <pre class="cfgpre" id="cfgPreview"></pre>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="copyCfg()">复制内容</button>
+      <button class="btn primary" onclick="downloadCfg()">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>下载
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   演示数据（BACKEND-TODO: 全部替换为真实计算结果）
+   - 数据上传 / 模型适配器 / 压力场景生成 / 指标计算 / 配置导出
+     接入点见各函数内的 BACKEND-TODO 注释
+   ============================================================ */
+const MOCK = {
+  dataset: {
+    name: 'Telco Customer Churn', tag: '演示数据',
+    file: 'telco_churn_reference.csv',
+    rows: 7043, featureCols: 20, label: 'Churn', labelType: 'binary',
+    positiveRate: 0.265,
+  },
+  model: {
+    name: 'ChurnClassifier', version: 'v1.0', algo: 'Random Forest',
+    adapter: 'model_adapter.py', connected: true, demo: true,
+    checks: [
+      { item: 'predict(X) 返回形状', expect: '(n,) 1-D', actual: '(7043,) 1-D', ok: true },
+      { item: 'predict_proba(X) 返回形状', expect: '(n, 2)', actual: '(7043, 2)', ok: true },
+      { item: '类别集合', expect: '{0, 1}', actual: '{0, 1}', ok: true },
+      { item: '概率归一化', expect: '每行和为 1', actual: '通过（抽样 500 行）', ok: true },
+      { item: '缺失值处理', expect: 'pipeline 内置 imputer', actual: 'SimpleImputer(median)', ok: true },
+    ],
+  },
+  baseline: { f1: 0.842, recall: 0.807, auc: 0.868, precision: 0.881, predRate: 0.249 },
+  scenarios: [
+    { id: 'monthly', name: '数值分布偏移', field: 'MonthlyCharges', type: 'numeric_shift',
+      desc: '均值变化', enabled: true, strength: 20, min: 0, max: 40, step: 5, unit: '%' },
+    { id: 'contract', name: '类别比例变化', field: 'Contract', type: 'categorical_shift',
+      desc: 'Month-to-month 占比', enabled: true, strength: 18, min: 0, max: 30, step: 3, unit: 'pp' },
+    { id: 'missing', name: '缺失值增加', field: 'TotalCharges', type: 'missing_up',
+      desc: '缺失率', enabled: true, strength: 15, min: 0, max: 40, step: 5, unit: '%' },
+    { id: 'extreme', name: '极端值注入', field: 'MonthlyCharges', type: 'extreme',
+      desc: '注入比例', enabled: false, strength: 2, min: 0, max: 10, step: 1, unit: '%' },
+  ],
+  seed: 42,
+  gradient: { x: [0, 5, 10, 15, 20, 25, 30] },
+  fields: [
+    { field: 'MonthlyCharges', change: '+20% 均值', method: 'PSI', score: 0.24, risk: '中度', riskCls: 't-warn',
+      psiBase: 0.00, hist: { ref: [410,690,980,1120,980,760,510,360,300,432], cur: [180,380,590,800,960,1010,890,700,470,162] },
+      refMean: 64.8, curMean: 77.8, bins: ['0-10','10-20','20-30','30-40','40-50','50-60','60-70','70-80','80-90','90-100'],
+      missRef: 0.001, missCur: 0.001,
+      explain: '月租费用整体上移 20%（64.8 → 77.8），分布右移明显。模型在低价区间的经验不再适用，F1 下降 4.1pp，是本轮实验中影响最大的输入变化。' },
+    { field: 'Contract', change: '+18pp 月付占比', method: '卡方检验', score: 0.19, risk: '中度', riskCls: 't-warn',
+      psiBase: 0.00, cat: { levels: ['Month-to-month', 'One year', 'Two year'],
+        ref: [0.55, 0.21, 0.24], cur: [0.73, 0.12, 0.15] },
+      chi2: 486.2, pvalue: 1e-6, missRef: 0.0, missCur: 0.0,
+      explain: '月付合同占比从 55% 升至 73%，长期合同用户比例被压缩。卡方检验 p < 1e-6，比例变化高度显著；该字段是模型的重要特征，需持续监控。' },
+    { field: 'TotalCharges', change: '缺失率 0.1% → 15%', method: '缺失率', score: 15.0, risk: '缺失异常', riskCls: 't-crit',
+      psiBase: 0.02, hist: { ref: [720,680,650,620,600,580,560,540,520,1073], cur: [610,580,550,530,510,490,470,450,430,1053] },
+      refMean: 2283, curMean: 2241, bins: ['0-1k','1-2k','2-3k','3-4k','4-5k','5-6k','6-7k','7-8k','8-9k','9k+'],
+      missRef: 0.001, missCur: 0.15,
+      explain: '总费用字段缺失率从 0.1% 升至 15%，远超 10% 的全局预警线。上游采集或 ETL 环节疑似出现问题；缺失样本按中位数填充会低估真实费用，应优先排查数据管道。' },
+    { field: 'tenure', change: '-12% 均值', method: 'PSI', score: 0.07, risk: '轻微', riskCls: 't-ok',
+      psiBase: 0.00, hist: { ref: [1100,780,610,520,470,440,420,400,380,923], cur: [1210,860,680,570,500,460,430,400,370,863] },
+      refMean: 32.4, curMean: 28.5, bins: ['0-6','6-12','12-24','24-36','36-48','48-60','60-66','66-72','72-80','80+'],
+      missRef: 0.0, missCur: 0.0,
+      explain: '在网时长均值下降 12%，新用户占比上升。PSI 0.07 处于轻微区间，暂不需要告警，但与合同结构变化叠加后值得观察。' },
+    { field: 'InternetService', change: '+9pp 光纤占比', method: '卡方检验', score: 0.04, risk: '轻微', riskCls: 't-ok',
+      psiBase: 0.00, cat: { levels: ['DSL', 'Fiber optic', 'No'], ref: [0.34, 0.44, 0.22], cur: [0.30, 0.53, 0.17] },
+      chi2: 98.7, pvalue: 0.0002, missRef: 0.0, missCur: 0.0,
+      explain: '光纤上网占比从 44% 升至 53%。检验显著但幅度温和，对模型输出的直接影响有限，纳入季度复查即可。' },
+  ],
+  thresholds: [
+    { th: 0.10, recall: 1.00, far: 0.60, delay: 1, rec: false },
+    { th: 0.20, recall: 0.85, far: 0.20, delay: 2, rec: true },
+    { th: 0.30, recall: 0.60, far: 0.05, delay: 3, rec: false },
+  ],
+  history: [
+    { name: '月租费用偏移梯度实验', time: '2026-11-16 19:20', ver: 'v1.0', scenes: 7, psi: 0.24, status: 'done' },
+    { name: '合同结构变化对比', time: '2026-11-15 14:05', ver: 'v1.0', scenes: 5, psi: 0.19, status: 'done' },
+    { name: '缺失值敏感性验证', time: '2026-11-14 10:42', ver: 'v1.0', scenes: 4, psi: 0.12, status: 'done' },
+    { name: '首次基线验证', time: '2026-11-13 16:30', ver: 'v0.9', scenes: 3, psi: 0.08, status: 'done' },
+  ],
+  configs: [
+    { ver: 'v3', time: '2026-11-16 19:24', note: '月租梯度实验后更新', rules: 5 },
+    { ver: 'v2', time: '2026-11-15 14:12', note: '加入 Contract 卡方规则', rules: 4 },
+    { ver: 'v1', time: '2026-11-13 16:38', note: '首个导出版本', rules: 3 },
+  ],
+  datasetFields: [
+    { f: 'customerID', t: 'ID', miss: 0, uniq: 7043, note: '不参与建模' },
+    { f: 'gender', t: '类别', miss: 0, uniq: 2, note: 'Male 50.5% / Female 49.5%' },
+    { f: 'SeniorCitizen', t: '数值(0/1)', miss: 0, uniq: 2, note: '0: 83.8% / 1: 16.2%' },
+    { f: 'tenure', t: '数值', miss: 0, uniq: 73, note: '均值 32.4 / 标准差 24.6' },
+    { f: 'InternetService', t: '类别', miss: 0, uniq: 3, note: 'DSL 34% / Fiber 44% / No 22%' },
+    { f: 'Contract', t: '类别', miss: 0, uniq: 3, note: '月付 55% / 一年 21% / 两年 24%' },
+    { f: 'MonthlyCharges', t: '数值', miss: 0, uniq: 1585, note: '均值 64.8 / 标准差 30.1' },
+    { f: 'TotalCharges', t: '数值', miss: 0.001, uniq: 6531, note: '均值 2283 / 标准差 2266' },
+    { f: 'Churn', t: '标签(0/1)', miss: 0, uniq: 2, note: '正类占比 26.5%' },
+  ],
+};
+</script>
+
+<script>
+/* ============================================================
+   应用状态与逻辑
+   ============================================================ */
+const D = MOCK;
+const $ = s => document.querySelector(s);
+const fmt = (v, n = 2) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(n);
+const pct = (v, n = 1) => (v == null || isNaN(v)) ? '—' : (v * 100).toFixed(n) + '%';
+
+const S = {
+  page: 'workbench',        // workbench | model | dataset | settings
+  tab: 'stress',            // stress | history | config
+  runState: 'done',         // done | stale | loading | error
+  lastRun: '2026-11-16 19:20',
+  noLabel: false,           // 演示：模拟无标签数据集
+  progress: { stage: 0, pct: 0 },
+  drawerField: null,
+  fmt: 'yaml',
+  cfgVersion: 'v3',
+  theme: 'light',           // light | dark
+};
+const STAGES = ['读取基准数据', '生成压力场景', '调用模型预测', '计算漂移与性能指标', '生成报告'];
+
+/* ---------- 主题切换（浅色 / 深色） ---------- */
+const ICON_MOON = '<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const ICON_SUN  = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>';
+function setTheme(t) {
+  S.theme = t === 'dark' ? 'dark' : 'light';
+  document.body.classList.toggle('dark', S.theme === 'dark');
+  applyChartTheme();
+  try { localStorage.setItem('ds-theme', S.theme); } catch (e) {}
+  const btn = $('#themeBtn');
+  if (btn) btn.innerHTML = S.theme === 'dark' ? ICON_SUN : ICON_MOON;
+}
+function toggleTheme() {
+  setTheme(S.theme === 'dark' ? 'light' : 'dark');
+  render();
+}
+/* BACKEND-TODO: 指标计算 —— runExperiment() 应调用真实检测器与模型评估
+   当前实现为前端演示：根据滑块强度插值出 PSI / F1 变化 */
+function runExperiment() {
+  if (S.runState === 'loading') return;
+  if (!D.scenarios.some(s => s.enabled)) return;
+  S.runState = 'loading';
+  S.progress = { stage: 0, pct: 0 };
+  render();
+  let i = 0;
+  const timer = setInterval(() => {
+    i++;
+    S.progress.stage = Math.min(i, STAGES.length);
+    S.progress.pct = Math.round(Math.min(i / STAGES.length, 1) * 100);
+    updateTopbar(); renderProgress();
+    if (i >= STAGES.length) {
+      clearInterval(timer);
+      S.runState = S.noLabel ? 'error' : 'done';
+      S.lastRun = nowStr();
+      render();
+    }
+  }, 520);
+}
+function markStale() {
+  if (S.runState === 'done' || S.runState === 'error') S.runState = 'stale';
+  renderTopbarOnly();
+}
+function nowStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* ---------- 演示用指标推导（前端插值，非真实计算） ---------- */
+function currentPsi() {
+  const m = D.scenarios.find(s => s.id === 'monthly');
+  if (!m || !m.enabled) return 0;
+  return 0.24 * Math.pow(m.strength / 20, 2);
+}
+function currentScenarioF1() {
+  let drop = 0;
+  const m = D.scenarios.find(s => s.id === 'monthly');
+  if (m && m.enabled) drop += 0.032 * Math.pow(m.strength / 20, 1.3);
+  const c = D.scenarios.find(s => s.id === 'contract');
+  if (c && c.enabled) drop += 0.009 * Math.pow(c.strength / 18, 1.2);
+  const x = D.scenarios.find(s => s.id === 'extreme');
+  if (x && x.enabled) drop += 0.004 * Math.pow(x.strength / 2, 1.1);
+  return Math.max(0.5, D.baseline.f1 - drop);
+}
+function currentMissing() {
+  const ms = D.scenarios.find(s => s.id === 'missing');
+  return ms && ms.enabled ? ms.strength / 100 : 0.001;
+}
+function gradientSeries() {
+  const m = D.scenarios.find(s => s.id === 'monthly');
+  const k = m && m.enabled ? 1 : 0;
+  return {
+    x: D.gradient.x,
+    f1: D.gradient.x.map(v => D.baseline.f1 - (k ? 0.041 * Math.pow(v / 20, 1.3) : 0) - 0.002 * v / 30),
+    psi: D.gradient.x.map(v => 0.24 * Math.pow(v / 20, 2)),
+  };
+}
+
+/* ---------- 顶部状态 ---------- */
+function statusChipHtml() {
+  if (S.runState === 'loading') return '<span class="status-chip st-loading"><span class="dot"></span>运行中 ' + S.progress.pct + '%</span>';
+  if (S.runState === 'stale') return '<span class="status-chip st-stale"><span class="dot"></span>待重新运行</span>';
+  if (S.runState === 'error') return '<span class="status-chip st-error"><span class="dot"></span>无法计算真实性能</span>';
+  return '<span class="status-chip st-done"><span class="dot"></span>实验已完成</span>';
+}
+function updateTopbar() { $('#statusChip').outerHTML = '<span id="statusChip">' + statusChipHtml() + '</span>'; }
+function renderTopbarOnly() { updateTopbar(); }
+
+/* ---------- 侧边栏 ---------- */
+const NAV = [
+  { id: 'workbench', lbl: '实验工作台', icon: '<path d="M4 5h16v4H4zM4 12h10v3H4zM4 19h7v2H4z"/>' },
+  { id: 'history', lbl: '实验历史', icon: '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/><path d="M12 3v2"/>' },
+  { id: 'model', lbl: '模型', icon: '<path d="M12 3l8 4v6c0 5-4 7.5-8 8-4-.5-8-3-8-8V7z"/>' },
+  { id: 'dataset', lbl: '数据集', icon: '<path d="M4 6h16M4 12h16M4 18h10"/>' },
+  { id: 'monitor', lbl: '监控规则', icon: '<path d="M3 12h4l3-7 4 14 3-7h4"/>' },
+  { id: 'settings', lbl: '设置', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10l2.1 2.1M19.1 4.9l-2.1 2.1m-10 10l-2.1 2.1"/>' },
+];
+function navActive() {
+  if (S.page === 'workbench') return S.tab === 'history' ? 'history' : S.tab === 'config' ? 'monitor' : 'workbench';
+  return S.page;
+}
+function renderNav() {
+  $('#nav').innerHTML = NAV.map(n => `
+    <button class="nav-item ${navActive() === n.id ? 'active' : ''}" data-nav="${n.id}">
+      <svg viewBox="0 0 24 24">${n.icon}</svg>${n.lbl}
+      ${n.id === 'history' ? '<span class="badge">' + D.history.length + '</span>' : ''}
+    </button>`).join('');
+  document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
+    const id = b.dataset.nav;
+    if (id === 'workbench') { S.page = 'workbench'; S.tab = 'stress'; }
+    else if (id === 'history') { S.page = 'workbench'; S.tab = 'history'; }
+    else if (id === 'monitor') { S.page = 'workbench'; S.tab = 'config'; }
+    else S.page = id;
+    render();
+  });
+}
+
+/* ---------- 面包屑 ---------- */
+function crumbHtml() {
+  const map = { model: '模型', dataset: '数据集', settings: '设置' };
+  const page = S.page === 'workbench' ? '实验工作台' : map[S.page];
+  let sub = '';
+  if (S.page === 'workbench') {
+    sub = S.tab === 'stress' ? '漂移压力测试' : S.tab === 'history' ? '实验历史' : '监控配置';
+  }
+  return sub
+    ? `<span>实验工作台</span><span class="sep">/</span><b>${sub}</b>`
+    : `<b>${page}</b>`;
+}
+
+/* ============================================================
+   图表（内联 SVG，无 CDN 依赖）
+   ============================================================ */
+/* 图表色板随主题切换（浅色 / 深色两套） */
+let CC = {};
+function applyChartTheme() {
+  const dark = S.theme === 'dark';
+  CC = dark
+    ? { green: '#3fbf7f', blue: '#3fb6c9', amber: '#d9a53f', grid: '#283039', axis: '#39434f', dim: '#6f7a8c', red: '#e2607a', teal: '#6e93ff' }
+    : { green: '#0d9455', blue: '#0e7490', amber: '#a16207', grid: '#e3e8f0', axis: '#c5cede', dim: '#8a94a9', red: '#c22f45', teal: '#2952cc' };
+}
+
+/* 组合图：漂移强度 × (F1 + PSI + 阈值线) */
+function trendChart(noLabelMode) {
+  const g = gradientSeries();
+  const w = 660, h = 250;
+  const pad = { l: 46, r: 46, t: 18, b: 36 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  /* 左轴 F1: 0.50–0.90；右轴 PSI: 0–0.60 */
+  const yF = v => pad.t + ih - (v - 0.50) / 0.40 * ih;
+  const yP = v => pad.t + ih - v / 0.60 * ih;
+  const X = i => pad.l + i / (g.x.length - 1) * iw;
+  let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="漂移强度与模型表现组合图">`;
+  for (let k = 0; k <= 4; k++) {
+    const y = pad.t + ih - ih * k / 4;
+    s += `<line x1="${pad.l}" y1="${y}" x2="${pad.l + iw}" y2="${y}" stroke="${CC.grid}" stroke-width="1"/>`;
+    s += `<text x="${pad.l - 7}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="${CC.dim}" font-family="monospace">${(0.50 + 0.40 * k / 4).toFixed(2)}</text>`;
+    s += `<text x="${pad.l + iw + 7}" y="${y + 3.5}" font-size="10" fill="${CC.dim}" font-family="monospace">${(0.60 * k / 4).toFixed(2)}</text>`;
+  }
+  s += `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${pad.l + iw}" y2="${pad.t + ih}" stroke="${CC.axis}" stroke-width="1.2"/>`;
+  g.x.forEach((v, i) => {
+    s += `<text x="${X(i)}" y="${h - 16}" text-anchor="middle" font-size="10" fill="${CC.dim}" font-family="monospace">${v === 0 ? '0%' : '+' + v + '%'}</text>`;
+  });
+  s += `<text x="${pad.l + iw / 2}" y="${h - 2}" text-anchor="middle" font-size="10.5" fill="${CC.dim}">压力强度（MonthlyCharges 均值偏移）</text>`;
+  /* 告警阈值虚线（右轴 0.20） */
+  s += `<line x1="${pad.l}" y1="${yP(0.20)}" x2="${pad.l + iw}" y2="${yP(0.20)}" stroke="${CC.amber}" stroke-width="1.3" stroke-dasharray="5 4"/>`;
+  s += `<text x="${pad.l + 4}" y="${yP(0.20) - 5}" font-size="10" fill="${CC.amber}">告警阈值 0.20</text>`;
+  /* PSI 蓝色点线 */
+  s += '<path d="M' + g.psi.map((v, i) => `${X(i)},${yP(v)}`).join(' L') + '" fill="none" stroke="' + CC.blue + '" stroke-width="1.6" stroke-dasharray="2 3"/>';
+  g.psi.forEach((v, i) => { s += `<circle cx="${X(i)}" cy="${yP(v)}" r="2.6" fill="${CC.blue}"/>`; });
+  /* F1 绿色实线，或无标签时的不可计算状态 */
+  if (noLabelMode) {
+    s += '<path d="M' + g.f1.map((v, i) => `${X(i)},${yF(v)}`).join(' L') + '" fill="none" stroke="' + CC.dim + '" stroke-width="1.4" stroke-dasharray="6 5"/>';
+    s += `<text x="${pad.l + iw - 6}" y="${yF(0.80) - 8}" text-anchor="end" font-size="10.5" fill="${CC.red}">真实标签缺失 · F1 不可计算</text>`;
+  } else {
+    s += '<path d="M' + g.f1.map((v, i) => `${X(i)},${yF(v)}`).join(' L') + '" fill="none" stroke="' + CC.green + '" stroke-width="2"/>';
+    g.f1.forEach((v, i) => { s += `<circle cx="${X(i)}" cy="${yF(v)}" r="2.6" fill="${CC.green}"/>`; });
+  }
+  s += '</svg>';
+  return s;
+}
+
+/* 抽屉内小型直方图 / 类别条 */
+function miniHist(f) {
+  const w = 330, h = 130;
+  const pad = { l: 8, r: 8, t: 12, b: 42 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const maxV = Math.max(...f.hist.ref, ...f.hist.cur);
+  const n = f.hist.ref.length, bw = iw / n;
+  let s = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+  for (let i = 0; i < n; i++) {
+    const hR = ih * f.hist.ref[i] / maxV, hC = ih * f.hist.cur[i] / maxV;
+    const x = pad.l + i * bw;
+    s += `<rect x="${x + 1}" y="${pad.t + ih - hR}" width="${bw - 2}" height="${hR}" fill="${CC.teal}" opacity="0.3" rx="1"/>`;
+    s += `<rect x="${x + 1}" y="${pad.t + ih - hC}" width="${bw - 2}" height="${hC}" fill="${CC.blue}" opacity="0.5" rx="1"/>`;
+  }
+  s += `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${pad.l + iw}" y2="${pad.t + ih}" stroke="${CC.axis}" stroke-width="1"/>`;
+  f.bins.forEach((b, i) => {
+    if (i % 2 === 0) s += `<text x="${pad.l + i * bw + bw / 2}" y="${h - 28}" text-anchor="middle" font-size="8.5" fill="${CC.dim}" font-family="monospace">${b}</text>`;
+  });
+  s += `<text x="${pad.l}" y="${h - 12}" font-size="9" fill="${CC.dim}">横轴：${f.field} 分箱 · 纵轴：样本计数</text>`;
+  s += '</svg>';
+  return s;
+}
+function miniCat(f) {
+  const w = 330, rowH = 30, h = f.cat.levels.length * rowH + 16;
+  const pad = { l: 100, r: 46, t: 8 };
+  const iw = w - pad.l - pad.r;
+  const maxV = Math.max(...f.cat.ref, ...f.cat.cur);
+  let s = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+  f.cat.levels.forEach((lv, i) => {
+    const y = pad.t + i * rowH;
+    s += `<text x="${pad.l - 8}" y="${y + 16}" text-anchor="end" font-size="10.5" fill="#4f5d56">${lv}</text>`;
+    s += `<rect x="${pad.l}" y="${y + 1}" width="${iw * f.cat.ref[i] / maxV}" height="9" rx="2" fill="${CC.teal}" opacity="0.45"/>`;
+    s += `<rect x="${pad.l}" y="${y + 13}" width="${iw * f.cat.cur[i] / maxV}" height="9" rx="2" fill="${CC.blue}" opacity="0.6"/>`;
+    s += `<text x="${pad.l + iw + 6}" y="${y + 9}" font-size="9.5" fill="${CC.teal}" font-family="monospace">${(f.cat.ref[i] * 100).toFixed(0)}%</text>`;
+    s += `<text x="${pad.l + iw + 6}" y="${y + 21}" font-size="9.5" fill="${CC.blue}" font-family="monospace">${(f.cat.cur[i] * 100).toFixed(0)}%</text>`;
+  });
+  s += '</svg>';
+  return s;
+}
+
+/* ============================================================
+   页面渲染
+   ============================================================ */
+function render() {
+  renderNav();
+  $('#crumb').innerHTML = crumbHtml();
+  updateTopbar();
+  const page = S.page === 'workbench' ? renderWorkbench() : S.page === 'model' ? renderModelPage() : S.page === 'dataset' ? renderDatasetPage() : renderSettingsPage();
+  $('#content').innerHTML = page + '<footer class="mode-foot">演示模式 · 本地数据未上传 · 指标为前端演示数据</footer>';
+  bind();
+}
+
+/* ---------- 实验工作台（三个标签页） ---------- */
+function renderWorkbench() {
+  const tabs = `
+    <div class="tabs">
+      <button class="tab ${S.tab === 'stress' ? 'active' : ''}" data-tab="stress">压力测试</button>
+      <button class="tab ${S.tab === 'history' ? 'active' : ''}" data-tab="history">实验历史</button>
+      <button class="tab ${S.tab === 'config' ? 'active' : ''}" data-tab="config">监控配置</button>
+    </div>`;
+  const body = S.tab === 'stress' ? renderStressTab() : S.tab === 'history' ? renderHistoryTab() : renderConfigTab();
+  return tabs + body;
+}
+
+function summaryBar() {
+  const d = D.dataset;
+  return `
+  <div class="summary-bar">
+    <div class="sum-item"><span class="k">基准数据集</span><span class="v">${d.name} <span class="tag t-neutral">${d.tag}</span></span></div>
+    <div class="sum-item"><span class="k">样本数</span><span class="v mono">${d.rows.toLocaleString()}</span></div>
+    <div class="sum-item"><span class="k">特征</span><span class="v mono">${d.featureCols} columns</span></div>
+    <div class="sum-item"><span class="k">目标字段</span><span class="v">${d.label} / ${d.labelType} · 正类 ${pct(d.positiveRate)}</span></div>
+    <div class="sum-item"><span class="k">模型</span><span class="v">${D.model.algo} / ${D.model.version}</span></div>
+    <div class="sum-item"><span class="k">随机种子</span><span class="v mono">${D.seed}（可复现）</span></div>
+  </div>`;
+}
+
+function renderStressTab() {
+  const head = `
+  <div class="page-head">
+    <div>
+      <h2>漂移压力测试</h2>
+      <div class="sub">评估输入变化对模型预测与性能的影响 · 最后运行 ${S.lastRun}</div>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="openModal()">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>导出监控配置
+      </button>
+      <button class="btn primary" id="runBtn" onclick="runExperiment()" ${(!D.scenarios.some(s => s.enabled) || S.runState === 'loading') ? 'disabled' : ''}>
+        ${S.runState === 'loading'
+          ? '<svg class="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg>运行中 ' + S.progress.pct + '%'
+          : '<svg viewBox="0 0 24 24"><path d="M7 4l12 8-12 8z"/></svg>运行压力测试'}
+      </button>
+    </div>
+  </div>`;
+
+  const left = `
+  <div class="panel cfg-panel">
+    <div class="panel-head"><div><h3><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>实验配置</h3><div class="sub">场景参数与随机种子，全部可复现</div></div></div>
+    <div class="panel-body">
+      <div class="cfg-block">
+        <div class="cfg-k">基准数据</div>
+        <!-- BACKEND-TODO: 数据上传 —— 接入真实 CSV 读取与字段类型识别 -->
+        <div class="cfg-file">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          <div style="min-width:0">
+            <div class="name">${D.dataset.file}</div>
+            <div class="meta">${D.dataset.rows.toLocaleString()} 行 · ${D.dataset.featureCols} 特征 · 标签 ${D.dataset.label}</div>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-block">
+        <div class="cfg-k">模型适配器</div>
+        <!-- BACKEND-TODO: 模型适配器 —— 接入本地 predict / predict_proba 调用与输出校验 -->
+        <div class="cfg-file">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-4 7.5-8 8-4-.5-8-3-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg>
+          <div style="min-width:0;flex:1">
+            <div class="name">${D.model.name} <span class="tag t-teal">演示模型</span></div>
+            <div class="meta">${D.model.adapter} · ${D.model.algo} ${D.model.version}</div>
+          </div>
+          <span class="tag t-ok">已连接</span>
+        </div>
+      </div>
+      <div class="cfg-block">
+        <div class="cfg-k">压力场景</div>
+        <!-- BACKEND-TODO: 压力场景生成 —— 接入真实场景生成器（基于基准数据做可控变换） -->
+        ${D.scenarios.map(sc => `
+          <div class="scen ${sc.enabled ? '' : 'disabled'}" data-scen="${sc.id}">
+            <div class="info">
+              <div class="nm">${sc.name}</div>
+              <div class="fl">${sc.field} · ${sc.desc}</div>
+              <div class="ctrl">
+                <div class="slider-row">
+                  <input type="range" min="${sc.min}" max="${sc.max}" step="${sc.step}" value="${sc.strength}"
+                         data-slider="${sc.id}" ${sc.enabled ? '' : 'disabled'}>
+                  <span class="sv">+${sc.strength}${sc.unit}</span>
+                </div>
+                <div class="hint">强度范围 ${sc.min}–${sc.max}${sc.unit} · 步长 ${sc.step}${sc.unit}</div>
+              </div>
+            </div>
+            <div class="switch ${sc.enabled ? 'on' : ''}" data-toggle="${sc.id}" role="switch" aria-checked="${sc.enabled}"></div>
+          </div>`).join('')}
+      </div>
+      <div class="cfg-block">
+        <div class="kv"><span class="k">随机种子</span><span class="v">${D.seed}</span></div>
+        <div class="kv"><span class="k">场景数量</span><span class="v" id="scenCount">${D.scenarios.filter(s => s.enabled).length} 个已启用</span></div>
+        <div class="kv" style="border:none">
+          <span class="k">无标签数据演示</span>
+          <div class="switch ${S.noLabel ? 'on' : ''}" data-toggle="nolabel"></div>
+        </div>
+      </div>
+      <div class="notice amber">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        <span>性能指标只有在测试样本具有有效真实标签时才计算；发现漂移不等于确认模型性能下降。</span>
+      </div>
+    </div>
+  </div>`;
+
+  return head + summaryBar() + `
+  <div class="bench">
+    ${left}
+    <div class="results-col">${renderResults()}</div>
+  </div>`;
+}
+
+function renderResults() {
+  const anyOn = D.scenarios.some(s => s.enabled);
+
+  /* 空状态：没有启用任何场景 */
+  if (!anyOn) {
+    return `
+    <div class="panel"><div class="state-box">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <h4>请至少启用一个压力场景</h4>
+      <p>左侧关闭了全部场景。打开任意场景开关并点击「运行压力测试」后，这里将展示漂移指标、趋势图与阈值验证结果。</p>
+    </div></div>`;
+  }
+
+  /* 运行中：分阶段进度 */
+  if (S.runState === 'loading') {
+    return `
+    <div class="metric-row">${[0, 1, 2, 3].map(() => '<div class="panel"><div class="skeleton"><div class="sk-line"></div><div class="sk-line short"></div></div></div>').join('')}</div>
+    <div class="panel"><div class="prog-wrap">
+      ${STAGES.map((st, i) => {
+        const cls = i < S.progress.stage ? 'done' : i === S.progress.stage ? 'active' : '';
+        return `<div class="prog-stage ${cls}"><span class="ic"><span class="ring"></span></span>${st}</div>`;
+      }).join('')}
+      <div class="prog-bar"><i style="width:${S.progress.pct}%"></i></div>
+    </div></div>
+    <div class="panel"><div class="skeleton">
+      <div class="sk-line"></div><div class="sk-line"></div><div class="sk-line short"></div>
+      <div class="sk-chart"></div>
+    </div></div>`;
+  }
+
+  /* 完成 / 待重新运行 / 无标签错误 */
+  const psi = currentPsi();
+  const f1 = currentScenarioF1();
+  const noLabel = S.runState === 'error';
+  const missRate = currentMissing();
+  const triggered = psi >= 0.20;
+
+  const metrics = `
+  <div class="metric-row">
+    <div class="metric"><span class="cdot" style="background:${CC.teal}"></span>
+      <div><div class="m-title">基准 F1</div>
+        <div class="m-val">${fmt(D.baseline.f1, 3)}</div>
+        <div class="m-sub">基准数据 · 全部字段</div></div></div>
+    <div class="metric"><span class="cdot" style="background:${noLabel ? CC.red : CC.green}"></span>
+      <div><div class="m-title">场景 F1</div>
+        <div class="m-val">${noLabel ? '—' : fmt(f1, 3)}</div>
+        ${noLabel
+          ? '<div class="delta" style="color:var(--red)">真实标签缺失，不可计算</div>'
+          : `<div class="delta" style="color:${f1 < D.baseline.f1 ? 'var(--red)' : 'var(--green)'}">${((f1 - D.baseline.f1) * 100).toFixed(1)} pp</div>`}
+      </div></div>
+    <div class="metric"><span class="cdot" style="background:${CC.blue}"></span>
+      <div><div class="m-title">最大 PSI</div>
+        <div class="m-val">${fmt(psi, 2)}</div>
+        <div class="m-sub">${psi >= 0.25 ? '高风险漂移' : psi >= 0.10 ? '中度漂移' : '轻微漂移'}</div></div></div>
+    <div class="metric"><span class="cdot" style="background:${CC.amber}"></span>
+      <div><div class="m-title">告警阈值</div>
+        <div class="m-val">0.20</div>
+        <div class="m-sub">${triggered ? '<span class="tag t-crit">已触发</span>' : '<span class="tag t-ok">未触发</span>'}</div></div></div>
+  </div>`;
+
+  /* 趋势图：需要 MonthlyCharges 场景 */
+  const mOn = D.scenarios.find(s => s.id === 'monthly').enabled;
+  const chartPanel = `
+  <div class="panel">
+    <div class="panel-head">
+      <div><h3><svg viewBox="0 0 24 24"><path d="M3 17l4-6 4 3 5-8 5 5"/></svg>漂移强度与模型表现</h3>
+        <div class="sub">单字段梯度实验：压力等级 0% → +30% 下的 F1 与 PSI · ${noLabel ? '性能曲线不可计算' : '基于真实标签'}</div></div>
+    </div>
+    <div class="panel-body">
+      ${mOn ? `
+      <div class="legend">
+        <span><i style="background:${CC.green}"></i>模型 F1（左轴）</span>
+        <span><i class="dotm" style="background:${CC.blue}"></i>最大 PSI（右轴）</span>
+        <span><i class="dashl" style="border-color:${CC.amber}"></i>告警阈值 0.20</span>
+      </div>
+      <div class="chart-box">${trendChart(noLabel)}</div>
+      ${noLabel
+        ? '<div class="notice amber" style="margin-top:10px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><span>当前数据集没有有效真实标签：只能观察输入分布与预测比例变化，不能计算 F1 / Recall / AUC，也无法确认性能下降。</span></div>'
+        : '<div class="notice blue" style="margin-top:10px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8.5v.5"/></svg><span>PSI 在 +25% 压力处越过 0.20 告警线，F1 随压力增强持续下降。发现漂移只说明输入变了，性能结论以 F1 对比为准。</span></div>'}`
+      : `
+      <div class="state-box">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-5 3 3 5-6"/></svg></div>
+        <h4>暂无梯度分析数据</h4>
+        <p>启用「数值分布偏移」场景后，这里将展示 0% → +30% 压力等级下的 F1 与 PSI 趋势。</p>
+      </div>`}
+    </div>
+  </div>`;
+
+  /* 字段漂移排行 + 阈值验证 */
+  const fieldRows = D.fields.map((f, i) => `
+    <tr class="clickable" data-field="${i}">
+      <td class="mono">${f.field}</td>
+      <td>${f.change}</td>
+      <td>${f.method}</td>
+      <td class="num">${f.method === '缺失率' ? (f.score).toFixed(1) + '%' : fmt(f.score, 2)}</td>
+      <td><span class="tag ${f.riskCls}">${f.risk}</span></td>
+    </tr>`).join('');
+
+  const bottom = `
+  <div class="bottom-grid">
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>字段漂移排行</h3>
+          <div class="sub">按分数降序 · 点击行查看分布详情</div></div>
+      </div>
+      <div class="panel-body" style="padding-top:6px">
+        <table>
+          <thead><tr><th>特征</th><th>变化幅度</th><th>检测方法</th><th class="num">分数</th><th>风险状态</th></tr></thead>
+          <tbody>${fieldRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>阈值验证</h3>
+          <div class="sub">基于本轮实验场景的误报 / 漏报权衡</div></div>
+      </div>
+      <div class="panel-body" style="padding-top:6px">
+        <div class="notice amber" style="margin-bottom:10px">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          <span>建议预警阈值：PSI ≥ 0.20</span>
+        </div>
+        <table>
+          <thead><tr><th>阈值</th><th class="num">检测召回</th><th class="num">误报率</th><th class="num">检测延迟</th><th>选择</th></tr></thead>
+          <tbody>${D.thresholds.map(t => `
+            <tr>
+              <td class="mono">${t.th.toFixed(2)}</td>
+              <td class="num">${pct(t.recall, 0)}</td>
+              <td class="num">${pct(t.far, 0)}</td>
+              <td class="num">${t.delay} 窗口</td>
+              <td>${t.rec ? '<span class="tag t-teal">推荐</span>' : '<button class="btn small" data-th="' + t.th + '">采用</button>'}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        <div style="font-size:11px;color:var(--text-3);margin:10px 0 12px;line-height:1.6">
+          阈值仅适用于当前基准数据和压力场景；更换数据集或模型后需要重新校准。检测延迟为按监控窗口估算的发现所需时间。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="S.tab='history';render()">查看完整实验结果</button>
+          <button class="btn" onclick="openModal()">导出 YAML</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  return metrics + chartPanel + bottom;
+}
+
+function renderHistoryTab() {
+  const statusMap = { done: '<span class="tag t-ok">完成</span>', running: '<span class="tag t-info">运行中</span>', failed: '<span class="tag t-crit">失败</span>' };
+  return `
+  <div class="page-head">
+    <div><h2>实验历史</h2><div class="sub">所有压力测试实验的记录与状态 · ${D.history.length} 条</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-body" style="padding-top:8px">
+      <table>
+        <thead><tr><th>实验名称</th><th>创建时间</th><th>模型版本</th><th class="num">场景数</th><th class="num">最大 PSI</th><th>状态</th><th></th></tr></thead>
+        <tbody>${D.history.map((h, i) => `
+          <tr>
+            <td style="font-weight:600">${h.name}</td>
+            <td class="mono">${h.time}</td>
+            <td class="mono">${h.ver}</td>
+            <td class="num">${h.scenes}</td>
+            <td class="num">${fmt(h.psi, 2)}</td>
+            <td>${statusMap[h.status]}</td>
+            <td class="num"><button class="btn small" onclick="S.tab='stress';render()">查看</button></td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderConfigTab() {
+  const cur = D.configs[0];
+  return `
+  <div class="page-head">
+    <div><h2>监控配置</h2><div class="sub">导出的配置版本与字段规则 · 当前使用 ${S.cfgVersion}</div></div>
+    <div class="actions">
+      <button class="btn" onclick="copyCfg()">复制当前配置</button>
+      <button class="btn primary" onclick="openModal()">导出配置</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><h3>配置版本</h3><div class="sub">每次导出都会保留独立版本，便于回溯阈值来源</div></div></div>
+    <div class="panel-body" style="padding-top:8px">
+      <table>
+        <thead><tr><th>版本</th><th>导出时间</th><th>说明</th><th class="num">规则数</th><th>状态</th><th></th></tr></thead>
+        <tbody>${D.configs.map(c => `
+          <tr>
+            <td class="mono" style="font-weight:600">${c.ver}</td>
+            <td class="mono">${c.time}</td>
+            <td>${c.note}</td>
+            <td class="num">${c.rules}</td>
+            <td>${S.cfgVersion === c.ver ? '<span class="tag t-teal">使用中</span>' : '<span class="tag t-neutral">历史</span>'}</td>
+            <td class="num"><button class="btn small" onclick="S.cfgVersion='${c.ver}';render()">${S.cfgVersion === c.ver ? '已选中' : '切换'}</button></td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><h3>字段规则 · ${S.cfgVersion}</h3><div class="sub">字段级检测方法与阈值</div></div></div>
+    <div class="panel-body" style="padding-top:8px">
+      <table>
+        <thead><tr><th>字段</th><th>方法</th><th class="num">预警阈值</th><th class="num">严重阈值</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">MonthlyCharges</td><td>PSI</td><td class="num">0.20</td><td class="num">0.30</td><td>数值分布偏移</td></tr>
+          <tr><td class="mono">Contract</td><td>卡方检验</td><td class="num">p&lt;0.05</td><td class="num">p&lt;0.01</td><td>类别比例变化</td></tr>
+          <tr><td class="mono">TotalCharges</td><td>缺失率</td><td class="num">10%</td><td class="num">15%</td><td>数据质量预警</td></tr>
+          <tr><td class="mono">tenure</td><td>PSI</td><td class="num">0.20</td><td class="num">0.30</td><td>数值分布偏移</td></tr>
+          <tr><td class="mono">InternetService</td><td>卡方检验</td><td class="num">p&lt;0.05</td><td class="num">p&lt;0.01</td><td>类别比例变化</td></tr>
+        </tbody>
+      </table>
+      <div class="notice amber" style="margin-top:12px">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        <span>全局规则：缺失率 ≥ 10% 预警 · 预测正类比例变化 ≥ 15pp 预警 · 监控窗口 1h · 最小样本数 500。阈值仅适用于当前基准数据和压力场景。</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- 模型页 ---------- */
+function renderModelPage() {
+  return `
+  <div class="page-head"><div><h2>模型</h2><div class="sub">适配器契约、输出校验与基准表现</div></div>
+    <div class="actions"><span class="tag t-teal">演示模型</span></div></div>
+  <div class="bottom-grid">
+    <div class="panel">
+      <div class="panel-head"><div><h3>适配器契约</h3><div class="sub">统一 predict 接口，算法不限</div></div></div>
+      <div class="panel-body">
+        <pre class="cfgpre" style="max-height:none">class ModelAdapter(Protocol):
+    def predict(self, X):
+        """返回 (n,) 1-D 预测类别数组"""
+    def predict_proba(self, X):
+        """可选：返回 (n, 2) 概率矩阵"""</pre>
+        <div class="notice amber" style="margin-top:12px">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-4 7.5-8 8-4-.5-8-3-8-8V7z"/></svg>
+          <span>pickle / joblib 可能执行任意代码，模型只在本机加载，不在公网服务器反序列化陌生模型文件。</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h3>输出校验</h3><div class="sub">${D.model.name} · ${D.model.adapter} · 已连接</div></div></div>
+      <div class="panel-body" style="padding-top:8px">
+        <table>
+          <thead><tr><th>校验项</th><th>期望</th><th>实际</th><th></th></tr></thead>
+          <tbody>${D.model.checks.map(c => `
+            <tr><td style="font-weight:600">${c.item}</td><td class="mono">${c.expect}</td><td class="mono">${c.actual}</td>
+            <td class="num">${c.ok ? '<span class="tag t-ok">通过</span>' : '<span class="tag t-crit">失败</span>'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><h3>基准表现</h3><div class="sub">基准数据上的模型指标（有真实标签时才可计算）</div></div></div>
+    <div class="panel-body">
+      <div class="metric-row" style="margin:0">
+        <div class="metric"><span class="cdot" style="background:${CC.teal}"></span><div><div class="m-title">F1</div><div class="m-val">${fmt(D.baseline.f1, 3)}</div></div></div>
+        <div class="metric"><span class="cdot" style="background:${CC.teal}"></span><div><div class="m-title">Recall</div><div class="m-val">${fmt(D.baseline.recall, 3)}</div></div></div>
+        <div class="metric"><span class="cdot" style="background:${CC.teal}"></span><div><div class="m-title">Precision</div><div class="m-val">${fmt(D.baseline.precision, 3)}</div></div></div>
+        <div class="metric"><span class="cdot" style="background:${CC.teal}"></span><div><div class="m-title">ROC-AUC</div><div class="m-val">${fmt(D.baseline.auc, 3)}</div></div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- 数据集页 ---------- */
+function renderDatasetPage() {
+  const d = D.dataset;
+  return `
+  <div class="page-head"><div><h2>数据集</h2><div class="sub">${d.name} · ${d.file} · ${d.tag}</div></div></div>
+  ${summaryBar()}
+  <div class="panel">
+    <div class="panel-head"><div><h3>字段概况</h3><div class="sub">类型识别与质量统计 · 展示关键字段，完整 ${d.featureCols} 列见 CSV</div></div></div>
+    <div class="panel-body" style="padding-top:8px">
+      <table>
+        <thead><tr><th>字段</th><th>类型</th><th class="num">缺失率</th><th class="num">唯一值</th><th>说明</th></tr></thead>
+        <tbody>${D.datasetFields.map(f => `
+          <tr><td class="mono" style="font-weight:600">${f.f}</td>
+          <td><span class="tag ${f.t.startsWith('标签') ? 't-teal' : f.t === '类别' || f.t === 'ID' ? 't-info' : 't-neutral'}">${f.t}</span></td>
+          <td class="num">${f.miss > 0 ? pct(f.miss, 1) : '0.0%'}</td>
+          <td class="num">${f.uniq.toLocaleString()}</td>
+          <td class="mono" style="font-size:11.5px">${f.note}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---------- 设置页 ---------- */
+function renderSettingsPage() {
+  return `
+  <div class="page-head"><div><h2>设置</h2><div class="sub">实验参数与本地运行选项</div></div></div>
+  <div class="bottom-grid">
+    <div class="panel">
+      <div class="panel-head"><div><h3>实验参数</h3><div class="sub">影响检测敏感度与结论判定</div></div></div>
+      <div class="panel-body">
+        <div class="kv"><span class="k">随机种子</span><span class="v">${D.seed}</span></div>
+        <div class="kv"><span class="k">PSI 分箱数</span><span class="v">10</span></div>
+        <div class="kv"><span class="k">影响判定阈值 ΔF1</span><span class="v">0.020</span></div>
+        <div class="kv"><span class="k">监控窗口</span><span class="v">1h</span></div>
+        <div class="kv"><span class="k">最小样本数</span><span class="v">500</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h3>隐私与本地运行</h3><div class="sub">数据不出本机</div></div></div>
+      <div class="panel-body">
+        <div class="kv"><span class="k">处理位置</span><span class="v">本地进程</span></div>
+        <div class="kv"><span class="k">数据上传</span><span class="v">关闭（不可开启）</span></div>
+        <div class="kv"><span class="k">模型加载</span><span class="v">仅本机文件</span></div>
+        <div class="kv"><span class="k">实验记录</span><span class="v">本地 SQLite</span></div>
+        <div class="notice amber" style="margin-top:12px">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-4 7.5-8 8-4-.5-8-3-8-8V7z"/></svg>
+          <span>本地优先设计：基准数据、场景数据与模型全程留在本机，导出的监控配置只包含阈值与方法约定。</span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   抽屉 / 模态
+   ============================================================ */
+function openDrawer(idx) {
+  const f = D.fields[idx];
+  S.drawerField = idx;
+  $('#drawerTitle').textContent = f.field;
+  const subParts = [f.method, '分数 ' + (f.method === '缺失率' ? f.score.toFixed(1) + '%' : fmt(f.score, 2))];
+  $('#drawerSub').innerHTML = `${f.change} · <span class="tag ${f.riskCls}">${f.risk}</span>`;
+  let body = '<h4>解释</h4><p style="font-size:12.5px;line-height:1.7;color:var(--text-2)">' + f.explain + '</p>';
+  if (f.cat) {
+    body += '<h4>类别占比对比</h4><div class="legend">'
+      + '<span><i style="background:' + CC.teal + ';opacity:.5"></i>基准</span>'
+      + '<span><i style="background:' + CC.blue + ';opacity:.6"></i>场景</span></div>'
+      + '<div class="chart-box">' + miniCat(f) + '</div>'
+      + (f.chi2 ? '<div style="font-size:11.5px;color:var(--text-3);margin-top:6px" class="mono">χ² = ' + f.chi2.toFixed(1) + ' · p ' + (f.pvalue < 1e-4 ? '&lt; 1e-4' : '= ' + f.pvalue) + '</div>' : '');
+  }
+  if (f.hist) {
+    body += '<h4>分布对比</h4><div class="legend">'
+      + '<span><i style="background:' + CC.teal + ';opacity:.35"></i>基准</span>'
+      + '<span><i style="background:' + CC.blue + ';opacity:.55"></i>场景</span></div>'
+      + '<div class="chart-box">' + miniHist(f) + '</div>';
+  }
+  body += '<h4>缺失率变化</h4><div class="kv"><span class="k">基准缺失率</span><span class="v">' + pct(f.missRef, 1) + '</span></div>'
+    + '<div class="kv"><span class="k">场景缺失率</span><span class="v">' + pct(f.missCur, 1) + (f.missCur > 0.10 ? ' <span class="tag t-crit">超预警线</span>' : '') + '</span></div>';
+  $('#drawerBody').innerHTML = body;
+  $('#drawer').classList.add('open');
+  $('#drawerMask').classList.add('open');
+}
+function closeDrawer() {
+  $('#drawer').classList.remove('open');
+  $('#drawerMask').classList.remove('open');
+}
+
+/* BACKEND-TODO: 配置导出 —— 接入真实配置生成与文件保存 */
+function buildCfg() {
+  return {
+    model_name: D.model.name.toLowerCase().replace(/\s/g, '_'),
+    model_version: D.model.version,
+    task_type: 'binary_classification',
+    dataset: D.dataset.file,
+    seed: D.seed,
+    features: {
+      MonthlyCharges: { method: 'psi', warning_threshold: 0.20, critical_threshold: 0.30 },
+      Contract: { method: 'chi_square', warning_pvalue: 0.05, critical_pvalue: 0.01 },
+      TotalCharges: { method: 'missing_rate', warning_threshold: 0.10, critical_threshold: 0.15 },
+      tenure: { method: 'psi', warning_threshold: 0.20, critical_threshold: 0.30 },
+      InternetService: { method: 'chi_square', warning_pvalue: 0.05, critical_pvalue: 0.01 },
+    },
+    global_rules: { missing_rate_alert: 0.10, prediction_rate_change: 0.15, f1_drop_alert: 0.02 },
+    monitor_window: '1h', min_samples: 500,
+    exported_from: 'DriftSentinel 演示模式',
+  };
+}
+function toYaml(obj, indent = 0) {
+  const pad = '  '.repeat(indent);
+  let out = '';
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v === null || v === undefined) out += `${pad}${k}: null\n`;
+    else if (Array.isArray(v)) {
+      if (!v.length) { out += `${pad}${k}: []\n`; return; }
+      out += `${pad}${k}:\n`;
+      v.forEach(it => { out += `${pad}  - ${typeof it === 'string' ? `'${it}'` : it}\n`; });
+    }
+    else if (typeof v === 'object') out += `${pad}${k}:\n${toYaml(v, indent + 1)}`;
+    else out += `${pad}${k}: ${typeof v === 'string' ? `'${v}'` : v}\n`;
+  });
+  return out;
+}
+function cfgText() { return S.fmt === 'yaml' ? toYaml(buildCfg()) : JSON.stringify(buildCfg(), null, 2); }
+function openModal() {
+  $('#cfgPreview').textContent = cfgText();
+  $('#modalMask').classList.add('open');
+}
+function closeModal() { $('#modalMask').classList.remove('open'); }
+function pickFmt(f) {
+  S.fmt = f;
+  document.querySelectorAll('.fmt-opt').forEach(el => el.classList.toggle('on', el.dataset.fmt === f));
+  $('#cfgPreview').textContent = cfgText();
+}
+function copyCfg() {
+  const text = cfgText();
+  const done = () => {
+    const btn = [...document.querySelectorAll('.modal-foot .btn')].find(b => b.textContent.includes('复制'));
+    if (btn) { const o = btn.textContent; btn.textContent = '已复制 ✓'; setTimeout(() => btn.textContent = o, 1300); }
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done && done(); } catch (e) {}
+  ta.remove();
+}
+function downloadCfg() {
+  const ext = S.fmt === 'yaml' ? 'yaml' : 'json';
+  const blob = new Blob([cfgText()], { type: 'text/' + ext + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'monitoring_config.' + ext;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  closeModal();
+}
+
+/* ============================================================
+   事件绑定
+   ============================================================ */
+function renderProgress() {
+  /* 只刷新运行相关区域，避免整页重绘造成跳动 */
+  const btn = $('#runBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg>运行中 ' + S.progress.pct + '%';
+  }
+  updateTopbar();
+  const stages = document.querySelectorAll('.prog-stage');
+  stages.forEach((el, i) => {
+    el.classList.toggle('done', i < S.progress.stage);
+    el.classList.toggle('active', i === S.progress.stage);
+  });
+  const bar = document.querySelector('.prog-bar i');
+  if (bar) bar.style.width = S.progress.pct + '%';
+}
+
+function bind() {
+  document.querySelectorAll('[data-tab]').forEach(t =>
+    t.onclick = () => { S.tab = t.dataset.tab; render(); });
+
+  /* 场景开关 */
+  document.querySelectorAll('[data-toggle]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.toggle;
+      if (id === 'nolabel') { S.noLabel = !S.noLabel; }
+      else {
+        const sc = D.scenarios.find(s => s.id === id);
+        sc.enabled = !sc.enabled;
+      }
+      markStale();
+      render();
+    };
+  });
+  /* 滑块 */
+  document.querySelectorAll('[data-slider]').forEach(el => {
+    el.oninput = () => {
+      const sc = D.scenarios.find(s => s.id === el.dataset.slider);
+      sc.strength = Number(el.value);
+      const sv = el.parentElement.querySelector('.sv');
+      if (sv) sv.textContent = '+' + sc.strength + sc.unit;
+      markStale();
+    };
+  });
+  /* 字段行 → 抽屉 */
+  document.querySelectorAll('[data-field]').forEach(tr =>
+    tr.onclick = () => openDrawer(Number(tr.dataset.field)));
+  /* 阈值采用 */
+  document.querySelectorAll('[data-th]').forEach(b =>
+    b.onclick = () => {
+      D.thresholds.forEach(t => { t.rec = t.th === Number(b.dataset.th); });
+      render();
+    });
+  /* 模态遮罩点击关闭 */
+  $('#modalMask').addEventListener('click', e => { if (e.target === $('#modalMask')) closeModal(); });
+  /* Esc 关闭 */
+  document.onkeydown = e => { if (e.key === 'Escape') { closeDrawer(); closeModal(); } };
+}
+
+/* ---------- 启动 ---------- */
+/* 先应用保存的主题再首次渲染，避免闪屏 */
+let savedTheme = 'light';
+try { savedTheme = localStorage.getItem('ds-theme') || 'light'; } catch (e) {}
+setTheme(savedTheme);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,376 @@
+{
+  "id": "bank-logistic-v1",
+  "name": "Bank Marketing Classifier",
+  "version": "1.0.0",
+  "algorithm": "Logistic Regression",
+  "seed": 42,
+  "label": "y",
+  "positiveClass": "yes",
+  "negativeClass": "no",
+  "numeric": [
+    {
+      "name": "age",
+      "mean": 41.054677623261696,
+      "scale": 10.385118035091061,
+      "median": 39.0
+    },
+    {
+      "name": "balance",
+      "mean": 1406.9054993678888,
+      "scale": 2809.8898190909904,
+      "median": 452.0
+    },
+    {
+      "name": "day",
+      "mean": 16.050884955752213,
+      "scale": 8.221276233552977,
+      "median": 16.0
+    },
+    {
+      "name": "duration",
+      "mean": 265.3021491782554,
+      "scale": 263.1724096028397,
+      "median": 185.0
+    },
+    {
+      "name": "campaign",
+      "mean": 2.7983565107458914,
+      "scale": 3.1279777950864185,
+      "median": 2.0
+    },
+    {
+      "name": "pdays",
+      "mean": 39.93236409608091,
+      "scale": 100.08833255114553,
+      "median": -1.0
+    },
+    {
+      "name": "previous",
+      "mean": 0.515802781289507,
+      "scale": 1.4899802157341697,
+      "median": 0.0
+    }
+  ],
+  "categorical": [
+    {
+      "name": "job",
+      "categories": [
+        "admin.",
+        "blue-collar",
+        "entrepreneur",
+        "housemaid",
+        "management",
+        "retired",
+        "self-employed",
+        "services",
+        "student",
+        "technician",
+        "unemployed",
+        "unknown"
+      ]
+    },
+    {
+      "name": "marital",
+      "categories": [
+        "divorced",
+        "married",
+        "single"
+      ]
+    },
+    {
+      "name": "education",
+      "categories": [
+        "primary",
+        "secondary",
+        "tertiary",
+        "unknown"
+      ]
+    },
+    {
+      "name": "default",
+      "categories": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "name": "housing",
+      "categories": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "name": "loan",
+      "categories": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "name": "contact",
+      "categories": [
+        "cellular",
+        "telephone",
+        "unknown"
+      ]
+    },
+    {
+      "name": "month",
+      "categories": [
+        "apr",
+        "aug",
+        "dec",
+        "feb",
+        "jan",
+        "jul",
+        "jun",
+        "mar",
+        "may",
+        "nov",
+        "oct",
+        "sep"
+      ]
+    },
+    {
+      "name": "poutcome",
+      "categories": [
+        "failure",
+        "other",
+        "success",
+        "unknown"
+      ]
+    }
+  ],
+  "coefficients": [
+    -0.018693517825020014,
+    0.006577874259168075,
+    -0.008564173426094277,
+    1.5231361393416172,
+    -0.41203814321594845,
+    -0.015763384199357678,
+    0.06225445091058646,
+    0.236375360550845,
+    -0.5324390669310067,
+    0.0727686839411432,
+    -0.3043880769943922,
+    0.2117873293274916,
+    0.6203526437204094,
+    -0.1420874215342078,
+    -0.2850007810486328,
+    0.735196455233298,
+    -0.14148979619762586,
+    -0.8077709082510167,
+    0.426937613321403,
+    0.21240827112898591,
+    -0.1737678678031371,
+    0.051601631811853704,
+    0.1369874553914692,
+    0.24051056319417513,
+    0.1418018826590524,
+    -0.42905786610699215,
+    -0.2946956396850872,
+    0.38493767482278984,
+    0.21304754396757236,
+    -0.12280550882986807,
+    0.4625010390783471,
+    -0.37225900394064226,
+    0.3779878825588928,
+    0.5722063021940882,
+    -0.8599521496152799,
+    -0.12581657416512157,
+    -0.38307510314799836,
+    0.594051274202726,
+    -0.16250997058683003,
+    -1.2285545109882992,
+    -0.8905125203726996,
+    0.00863435973568154,
+    1.5865264104439465,
+    -0.9681052739067526,
+    -0.7547697378131569,
+    1.8719813377795496,
+    0.5423923439566593,
+    -0.641942736138892,
+    0.006998657060052721,
+    1.6666963719105394,
+    -0.9415102576940004
+  ],
+  "intercept": 0.12064476404809,
+  "referenceMetrics": {
+    "f1": 0.5242290748898678,
+    "recall": 0.7628205128205128,
+    "auc": 0.8902196887209377
+  },
+  "trainRows": 3164,
+  "referenceRows": 1357,
+  "parityRows": [
+    {
+      "row": {
+        "age": 44,
+        "job": "entrepreneur",
+        "marital": "single",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 1136,
+        "housing": "yes",
+        "loan": "yes",
+        "contact": "cellular",
+        "day": 3,
+        "month": "apr",
+        "duration": 345,
+        "campaign": 2,
+        "pdays": 249,
+        "previous": 7,
+        "poutcome": "other"
+      },
+      "probability": 0.6611237929650817
+    },
+    {
+      "row": {
+        "age": 34,
+        "job": "management",
+        "marital": "married",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 180,
+        "housing": "no",
+        "loan": "no",
+        "contact": "cellular",
+        "day": 16,
+        "month": "jun",
+        "duration": 298,
+        "campaign": 3,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.5704986787944964
+    },
+    {
+      "row": {
+        "age": 32,
+        "job": "management",
+        "marital": "single",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 474,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "cellular",
+        "day": 7,
+        "month": "aug",
+        "duration": 90,
+        "campaign": 3,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.19647648350955604
+    },
+    {
+      "row": {
+        "age": 30,
+        "job": "technician",
+        "marital": "single",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 6619,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "cellular",
+        "day": 21,
+        "month": "aug",
+        "duration": 239,
+        "campaign": 8,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.17441989438918648
+    },
+    {
+      "row": {
+        "age": 46,
+        "job": "management",
+        "marital": "married",
+        "education": "tertiary",
+        "default": "no",
+        "balance": 1375,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "cellular",
+        "day": 17,
+        "month": "nov",
+        "duration": 308,
+        "campaign": 3,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.31489351754668776
+    },
+    {
+      "row": {
+        "age": 66,
+        "job": "retired",
+        "marital": "married",
+        "education": "primary",
+        "default": "no",
+        "balance": 206,
+        "housing": "no",
+        "loan": "no",
+        "contact": "cellular",
+        "day": 9,
+        "month": "feb",
+        "duration": 479,
+        "campaign": 1,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.8553573481650814
+    },
+    {
+      "row": {
+        "age": 35,
+        "job": "admin.",
+        "marital": "married",
+        "education": "secondary",
+        "default": "no",
+        "balance": 8652,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 24,
+        "month": "jun",
+        "duration": 103,
+        "campaign": 6,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.06412347666830075
+    },
+    {
+      "row": {
+        "age": 33,
+        "job": "blue-collar",
+        "marital": "single",
+        "education": "secondary",
+        "default": "no",
+        "balance": -416,
+        "housing": "yes",
+        "loan": "no",
+        "contact": "unknown",
+        "day": 16,
+        "month": "may",
+        "duration": 767,
+        "campaign": 2,
+        "pdays": -1,
+        "previous": 0,
+        "poutcome": "unknown"
+      },
+      "probability": 0.539845356433169
+    }
+  ]
+}

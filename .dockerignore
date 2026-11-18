@@ -1,0 +1,11 @@
+node_modules
+localdata
+test-workspace
+.venv
+.git
+dist
+test-results
+playwright-report
+html
+__pycache__
+.pytest_cache

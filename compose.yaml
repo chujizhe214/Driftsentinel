@@ -1,0 +1,25 @@
+name: driftsentinel
+
+services:
+  driftsentinel:
+    image: driftsentinel:1.0.0
+    container_name: DriftSentinel
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./localdata:/data
+      - ./models:/app/models:ro
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 30s
+
+networks:
+  default:
+    name: DriftSentinel

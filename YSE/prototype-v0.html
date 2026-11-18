@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DriftSentinel · 模型漂移压力测试工作台</title>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --canvas: #f5f7f6;
+      --surface: #fff;
+      --surface-soft: #f8faf9;
+      --line: #dfe6e1;
+      --line-soft: #ebf0ec;
+      --ink: #17201b;
+      --muted: #66736a;
+      --subtle: #89958c;
+      --teal: #117c70;
+      --teal-dark: #0c6259;
+      --teal-soft: #e5f4f0;
+      --blue: #3c70c8;
+      --blue-soft: #eaf1fc;
+      --orange: #b97812;
+      --orange-soft: #fff4dc;
+      --red: #c74845;
+      --red-soft: #fdeceb;
+      --green: #15855d;
+      --green-soft: #e6f6ef;
+      --shadow: 0 2px 9px rgba(28, 52, 38, .04), 0 8px 22px rgba(28, 52, 38, .035);
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { background: var(--canvas); color: var(--ink); font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app-shell { min-height: 100vh; display: flex; }
+    .sidebar { width: 238px; flex: 0 0 238px; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+    .brand { padding: 22px 20px 18px; border-bottom: 1px solid var(--line-soft); }
+    .brand-row { display: flex; align-items: center; gap: 10px; }
+    .brand-mark { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 8px; background: var(--teal); color: white; }
+    .brand-name { font-size: 16px; font-weight: 700; letter-spacing: .01em; }
+    .brand-sub { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .project-switcher { margin: 16px 14px 9px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .project-switcher small { display: block; color: var(--subtle); font-size: 10px; margin-bottom: 1px; }
+    .project-switcher strong { font-size: 12px; font-weight: 650; }
+    .nav { padding: 8px 10px; flex: 1; }
+    .nav-section { color: var(--subtle); font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 12px 11px 7px; text-transform: uppercase; }
+    .nav-item { width: 100%; display: flex; gap: 11px; align-items: center; border: 0; border-radius: 6px; color: var(--muted); background: transparent; text-align: left; padding: 10px 11px; margin: 2px 0; transition: .15s ease; }
+    .nav-item:hover { color: var(--ink); background: var(--surface-soft); }
+    .nav-item.active { color: var(--teal-dark); background: var(--teal-soft); font-weight: 650; }
+    .nav-item svg { width: 16px; height: 16px; stroke-width: 1.8; }
+    .sidebar-bottom { border-top: 1px solid var(--line-soft); padding: 14px 18px 18px; color: var(--muted); font-size: 11px; }
+    .local-line { display: flex; align-items: center; gap: 7px; color: var(--green); font-weight: 650; margin-bottom: 4px; }
+    .sidebar-bottom p { margin: 0; color: var(--subtle); }
+    .main { flex: 1; min-width: 0; }
+    .topbar { height: 58px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.9); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; position: sticky; top: 0; z-index: 5; }
+    .crumb { color: var(--subtle); font-size: 12px; }
+    .crumb strong { color: var(--ink); font-weight: 650; }
+    .top-actions { display: flex; gap: 9px; align-items: center; }
+    .local-badge { display: flex; gap: 6px; align-items: center; color: var(--green); border: 1px solid #cce9dc; background: var(--green-soft); border-radius: 20px; padding: 5px 10px; font-size: 11px; font-weight: 650; }
+    .content { max-width: 1500px; margin: 0 auto; padding: 28px 30px 48px; }
+    .page-head { display: flex; gap: 20px; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+    h1, h2, h3, h4, p { margin: 0; }
+    h1 { font-size: 25px; line-height: 1.2; letter-spacing: -.02em; }
+    .page-lead { color: var(--muted); margin-top: 6px; font-size: 13px; }
+    .head-actions { display: flex; gap: 8px; }
+    .btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; transition: .15s ease; }
+    .btn:hover { border-color: #b9cbc0; background: var(--surface-soft); }
+    .btn:disabled { opacity: .55; cursor: wait; }
+    .btn svg { width: 15px; height: 15px; }
+    .btn-primary { background: var(--teal); border-color: var(--teal); color: white; }
+    .btn-primary:hover { background: var(--teal-dark); border-color: var(--teal-dark); }
+    .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
+    .summary-strip { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); box-shadow: var(--shadow); margin-bottom: 22px; }
+    .summary-cell { min-width: 0; padding: 13px 16px; border-right: 1px solid var(--line-soft); }
+    .summary-cell:last-child { border: 0; }
+    .summary-label { display: block; color: var(--subtle); font-size: 11px; margin-bottom: 2px; }
+    .summary-value { font-weight: 650; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .grid { display: grid; gap: 18px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .layout-main { display: grid; grid-template-columns: minmax(320px, .76fr) minmax(0, 1.5fr); gap: 20px; align-items: start; }
+    .stack { display: grid; gap: 18px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .card-head { padding: 16px 18px 13px; border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+    .card-head h2, .card-head h3 { font-size: 14px; line-height: 1.35; }
+    .card-head p { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .card-body { padding: 17px 18px; }
+    .muted { color: var(--muted); }
+    .subtle { color: var(--subtle); }
+    .small { font-size: 11px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .status { display: inline-flex; align-items: center; gap: 5px; border-radius: 14px; font-size: 10px; font-weight: 700; padding: 4px 8px; white-space: nowrap; }
+    .status svg, .note svg { width: 12px; height: 12px; flex: 0 0 auto; }
+    .status.ok { color: var(--green); background: var(--green-soft); }
+    .status.warn { color: var(--orange); background: var(--orange-soft); }
+    .status.critical { color: var(--red); background: var(--red-soft); }
+    .status.info { color: var(--blue); background: var(--blue-soft); }
+    .file-drop { border: 1px dashed #b8c9bd; background: var(--surface-soft); border-radius: 7px; padding: 17px; display: flex; align-items: center; gap: 13px; cursor: pointer; transition: .15s ease; }
+    .file-drop:hover { border-color: var(--teal); background: #f2faf7; }
+    .file-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 7px; background: var(--teal-soft); color: var(--teal); flex: 0 0 auto; }
+    .file-drop strong { font-size: 12px; display: block; }
+    .file-drop span { color: var(--muted); font-size: 11px; display: block; margin-top: 2px; }
+    .input-file { display: none; }
+    .field { display: grid; gap: 6px; }
+    .field label { color: var(--muted); font-size: 11px; font-weight: 650; }
+    select, input[type="number"], input[type="text"] { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 5px; height: 34px; padding: 0 9px; width: 100%; outline: 0; }
+    select:focus, input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(17,124,112,.1); }
+    .key-value { display: grid; grid-template-columns: 1fr auto; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); align-items: center; }
+    .key-value:last-child { border-bottom: 0; }
+    .key-value .k { color: var(--muted); font-size: 12px; }
+    .key-value .v { font-weight: 650; font-size: 12px; }
+    .note { color: var(--muted); background: #f8faf9; border-left: 3px solid #a9c4b2; padding: 10px 12px; font-size: 11px; }
+    .notice { color: #526158; background: #f5f8f6; border: 1px solid var(--line-soft); border-radius: 6px; padding: 11px 13px; font-size: 11px; }
+    .notice strong { color: var(--ink); }
+    .metric-card { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 15px; box-shadow: var(--shadow); }
+    .metric-label { color: var(--muted); font-size: 11px; font-weight: 650; }
+    .metric-top { display: flex; align-items: center; gap: 7px; }
+    .metric-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .metric-value-row { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+    .metric-value { font-size: 25px; line-height: 1; font-weight: 720; letter-spacing: -.03em; }
+    .metric-delta { font-size: 10px; font-weight: 700; padding: 3px 5px; border-radius: 4px; }
+    .metric-caption { color: var(--subtle); font-size: 10px; margin-top: 8px; }
+    .chart-wrap { position: relative; height: 270px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { padding: 9px 12px; text-align: left; background: var(--surface-soft); color: var(--muted); font-size: 10px; font-weight: 700; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+    tbody tr:hover { background: #fbfcfb; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .bar-line { display: flex; align-items: center; gap: 9px; min-width: 150px; }
+    .bar { height: 6px; border-radius: 4px; background: var(--teal); min-width: 2px; }
+    .bar-track { flex: 1; background: var(--line-soft); border-radius: 4px; height: 6px; }
+    .pill-row { display: flex; gap: 7px; flex-wrap: wrap; }
+    .pill { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 18px; padding: 6px 10px; font-size: 11px; }
+    .pill.active { border-color: #b1dbd2; background: var(--teal-soft); color: var(--teal-dark); font-weight: 700; }
+    .scenario-card { border: 1px solid var(--line); border-radius: 7px; padding: 15px; background: var(--surface); }
+    .scenario-card.disabled { opacity: .58; }
+    .scenario-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .scenario-name { display: flex; gap: 9px; align-items: center; font-weight: 650; font-size: 13px; }
+    .toggle { width: 30px; height: 18px; padding: 2px; border: 0; border-radius: 20px; background: #c8d3cc; transition: .15s ease; }
+    .toggle::after { content: ""; display: block; width: 14px; height: 14px; border-radius: 50%; background: white; transition: .15s ease; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+    .toggle.on { background: var(--teal); }
+    .toggle.on::after { transform: translateX(12px); }
+    .scenario-desc { color: var(--muted); font-size: 11px; margin: 9px 0 13px 39px; }
+    .range-row { display: grid; grid-template-columns: 1fr 52px; gap: 10px; align-items: center; margin-left: 39px; }
+    input[type="range"] { width: 100%; accent-color: var(--teal); }
+    .range-value { border: 1px solid var(--line); color: var(--teal-dark); background: var(--teal-soft); border-radius: 5px; padding: 4px 5px; text-align: center; font-size: 11px; font-weight: 700; }
+    .progress { height: 6px; border-radius: 4px; overflow: hidden; background: var(--line-soft); margin-top: 11px; display: none; }
+    .progress > span { display: block; width: 0; height: 100%; background: var(--teal); transition: width .25s ease; }
+    .verdict { border-radius: 6px; padding: 13px 14px; border-left: 3px solid; }
+    .verdict + .verdict { margin-top: 9px; }
+    .verdict h4 { font-size: 12px; margin-bottom: 4px; }
+    .verdict p { color: var(--muted); font-size: 11px; }
+    .verdict.safe { border-color: var(--green); background: #f2faf6; }
+    .verdict.observed { border-color: var(--orange); background: #fffaf0; }
+    .verdict.impact { border-color: var(--red); background: #fff6f5; }
+    .verdict.nolabel { border-color: var(--blue); background: #f4f8fe; }
+    .empty-state { padding: 46px 24px; text-align: center; }
+    .empty-state .empty-icon { margin: 0 auto 12px; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--teal); background: var(--teal-soft); }
+    .empty-state h2 { font-size: 16px; }
+    .empty-state p { color: var(--muted); font-size: 12px; margin: 6px auto 18px; max-width: 390px; }
+    .export-code { max-height: 460px; overflow: auto; margin: 0; border-radius: 6px; background: #17221c; color: #d8e9dd; padding: 15px; font: 11px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+    .export-tabs { display: flex; gap: 5px; }
+    .export-tab { border: 0; background: transparent; color: var(--muted); font-size: 11px; padding: 4px 7px; border-radius: 4px; }
+    .export-tab.active { background: var(--teal-soft); color: var(--teal-dark); font-weight: 700; }
+    .toast { position: fixed; right: 24px; bottom: 23px; background: #1c2a21; color: white; padding: 10px 13px; border-radius: 6px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.2); opacity: 0; pointer-events: none; transform: translateY(8px); transition: .2s ease; z-index: 20; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .hidden { display: none !important; }
+    @media (max-width: 1080px) { .sidebar { width: 205px; flex-basis: 205px; } .layout-main { grid-template-columns: 1fr; } .summary-strip { grid-template-columns: repeat(3, 1fr); } .summary-cell:first-child { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--line-soft); } .summary-cell:nth-child(3) { border-right: 0; } .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 720px) { .app-shell { display: block; } .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); } .brand { padding: 15px 18px 12px; } .project-switcher, .sidebar-bottom { display: none; } .nav { display: flex; overflow-x: auto; padding: 8px 10px; gap: 3px; } .nav-section { display: none; } .nav-item { width: auto; min-width: max-content; margin: 0; padding: 8px 10px; } .nav-item span { display: none; } .topbar { padding: 0 16px; height: 50px; } .content { padding: 20px 15px 38px; } .page-head { display: block; } .head-actions { margin-top: 14px; } .summary-strip, .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } .summary-cell, .summary-cell:first-child { grid-column: auto; border-right: 0; border-bottom: 1px solid var(--line-soft); } .summary-cell:last-child { border-bottom: 0; } h1 { font-size: 22px; } }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-row"><div class="brand-mark"><i data-lucide="radar"></i></div><div><div class="brand-name">DriftSentinel</div><div class="brand-sub">Model quality workbench</div></div></div>
+      </div>
+      <div class="project-switcher"><div><small>当前项目</small><strong>Churn · demo</strong></div><i data-lucide="chevrons-up-down" style="width:14px;color:var(--subtle)"></i></div>
+      <nav class="nav">
+        <div class="nav-section">Workspace</div>
+        <button class="nav-item active" data-view="overview"><i data-lucide="flask-conical"></i><span>实验工作台</span></button>
+        <button class="nav-item" data-view="profile"><i data-lucide="table-2"></i><span>数据画像</span></button>
+        <button class="nav-item" data-view="scenarios"><i data-lucide="sliders-horizontal"></i><span>漂移场景</span></button>
+        <button class="nav-item" data-view="results"><i data-lucide="chart-no-axes-combined"></i><span>结果分析</span></button>
+        <button class="nav-item" data-view="calibration"><i data-lucide="target"></i><span>阈值校准</span></button>
+        <div class="nav-section">Output</div>
+        <button class="nav-item" data-view="export"><i data-lucide="file-output"></i><span>配置导出</span></button>
+      </nav>
+      <div class="sidebar-bottom"><div class="local-line"><i data-lucide="shield-check" style="width:14px;height:14px"></i>本地工作区</div><p>数据和模型默认留在本机</p></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="crumb">DriftSentinel <span>/</span> <strong id="crumbText">实验工作台</strong></div><div class="top-actions"><div class="local-badge"><i data-lucide="check-circle-2" style="width:13px;height:13px"></i>本地运行</div><button class="btn btn-quiet" id="resetBtn" title="重置演示数据"><i data-lucide="rotate-ccw"></i></button></div></header>
+      <section class="content" id="app"></section>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+  <input class="input-file" id="csvInput" type="file" accept=".csv,text/csv">
+
+  <script>
+    const state = {
+      view: 'overview',
+      dataset: { name: 'telco_churn_reference.csv', rows: 7043, columns: 20, label: 'Churn', headers: ['MonthlyCharges','Contract','TotalCharges','tenure','InternetService','SeniorCitizen','Churn'], missing: 0.7, duplicates: 13, source: '内置示例', features: [
+        { name: 'MonthlyCharges', type: '数值', unique: 1585, missing: 0.0, mean: '64.76', method: 'PSI', score: 0.24, risk: '中度' },
+        { name: 'Contract', type: '类别', unique: 3, missing: 0.0, mean: 'Month-to-month 55%', method: 'Chi-square', score: 0.18, risk: '中度' },
+        { name: 'TotalCharges', type: '数值', unique: 6531, missing: 0.2, mean: '2283.30', method: 'KS', score: 0.15, risk: '轻微' },
+        { name: 'tenure', type: '数值', unique: 73, missing: 0.0, mean: '32.37', method: 'PSI', score: 0.08, risk: '轻微' },
+        { name: 'InternetService', type: '类别', unique: 3, missing: 0.0, mean: 'Fiber optic 44%', method: 'Chi-square', score: 0.05, risk: '轻微' },
+        { name: 'SeniorCitizen', type: '类别', unique: 2, missing: 0.0, mean: 'No 84%', method: 'Chi-square', score: 0.03, risk: '轻微' }
+      ] },
+      model: { name: 'ChurnClassifier', version: 'v1.0', kind: 'Random Forest', connected: true },
+      scenarios: [
+        { id: 'numeric', name: '数值均值偏移', field: 'MonthlyCharges', desc: '模拟月度费用整体上移，观察输入变化是否传导到模型表现。', value: 20, unit: '%', on: true },
+        { id: 'category', name: '类别比例变化', field: 'Contract', desc: '提高 Month-to-month 用户比例，模拟客群结构发生改变。', value: 18, unit: '%', on: true },
+        { id: 'missing', name: '缺失值增加', field: 'TotalCharges', desc: '注入缺失值，验证数据质量规则和模型对缺失的敏感度。', value: 15, unit: '%', on: true },
+        { id: 'outlier', name: '极端值注入', field: 'MonthlyCharges', desc: '注入超出基准分位数范围的值，检查异常值风险。', value: 2, unit: '%', on: false }
+      ],
+      results: { ran: true, f1: 0.801, recall: 0.774, auc: 0.844, baselineF1: 0.842, psi: 0.24, predictionRate: 0.31, baselinePredictionRate: 0.22 },
+      threshold: 0.20,
+      exportTab: 'yaml'
+    };
+    const viewNames = { overview: '实验工作台', profile: '数据画像', scenarios: '漂移场景', results: '结果分析', calibration: '阈值校准', export: '配置导出' };
+    const app = document.getElementById('app');
+    let chart;
+
+    function icon(name, cls='') { return `<i data-lucide="${name}"${cls ? ` class="${cls}"` : ''}></i>`; }
+    function refreshIcons() { if (window.lucide) lucide.createIcons({ attrs: { 'stroke-width': 1.8 } }); }
+    function toast(message) { const el = document.getElementById('toast'); el.textContent = message; el.classList.add('show'); clearTimeout(window.__toast); window.__toast = setTimeout(() => el.classList.remove('show'), 2200); }
+    function fmt(n, digits=3) { return Number(n).toFixed(digits); }
+    function riskClass(risk) { return risk === '高风险' ? 'critical' : risk === '中度' ? 'warn' : 'ok'; }
+    function metricCard(label, value, caption, color, delta='') { return `<div class="metric-card"><div class="metric-top"><span class="metric-dot" style="background:${color}"></span><span class="metric-label">${label}</span></div><div class="metric-value-row"><strong class="metric-value" style="color:${color}">${value}</strong>${delta ? `<span class="metric-delta" style="color:var(--red);background:var(--red-soft)">${delta}</span>` : ''}</div><div class="metric-caption">${caption}</div></div>`; }
+    function card(title, desc, body, action='') { return `<section class="card"><div class="card-head"><div><h2>${title}</h2>${desc ? `<p>${desc}</p>` : ''}</div>${action}</div><div class="card-body">${body}</div></section>`; }
+    function summary() { const d = state.dataset; return `<div class="summary-strip"><div class="summary-cell"><span class="summary-label">基准数据集</span><span class="summary-value">${d.name}</span></div><div class="summary-cell"><span class="summary-label">样本数</span><span class="summary-value">${d.rows.toLocaleString()}</span></div><div class="summary-cell"><span class="summary-label">特征数</span><span class="summary-value">${d.columns} columns</span></div><div class="summary-cell"><span class="summary-label">目标字段</span><span class="summary-value">${d.label} / binary</span></div><div class="summary-cell"><span class="summary-label">模型</span><span class="summary-value">${state.model.name} · ${state.model.version}</span></div></div>`; }
+    function pageHead(title, lead, action='') { return `<div class="page-head"><div><h1>${title}</h1><p class="page-lead">${lead}</p></div><div class="head-actions">${action}</div></div>`; }
+    function render() {
+      if (chart) { chart.destroy(); chart = null; }
+      document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === state.view));
+      document.getElementById('crumbText').textContent = viewNames[state.view];
+      const actions = `<button class="btn" data-action="export"><i data-lucide="download"></i>导出配置</button><button class="btn btn-primary" data-action="run"><i data-lucide="play"></i>运行压力测试</button>`;
+      let body = '';
+      if (state.view === 'overview') body = renderOverview();
+      if (state.view === 'profile') body = renderProfile();
+      if (state.view === 'scenarios') body = renderScenarios();
+      if (state.view === 'results') body = renderResults();
+      if (state.view === 'calibration') body = renderCalibration();
+      if (state.view === 'export') body = renderExport();
+      app.innerHTML = summary() + pageHead(viewNames[state.view], pageLead(state.view), state.view === 'overview' || state.view === 'results' ? actions : '');
+      app.innerHTML += body;
+      refreshIcons();
+      if (state.view === 'overview' || state.view === 'results') drawChart();
+      if (state.view === 'calibration') drawCalibration();
+    }
+    function pageLead(view) { return ({ overview:'从基准数据出发，生成可控变化并观察模型是否保持稳定。', profile:'确认字段类型、质量和基准统计，作为后续场景的参照。', scenarios:'选择要注入的变化类型和强度，实验参数将保存在本次运行中。', results:'分层查看数据漂移、预测变化与真实模型性能，避免把三者混为一谈。', calibration:'用已知压力场景校准告警阈值，比较误报、漏报与检测召回。', export:'导出可复用的监控规则，配置中不包含原始数据或模型权重。' })[view]; }
+    function renderOverview() {
+      const r = state.results;
+      const labelOptions = (state.dataset.headers || [state.dataset.label]).map(h => `<option value="${escapeHtml(h)}" ${h === state.dataset.label ? 'selected' : ''}>${escapeHtml(h)}</option>`).join('');
+      const setup = `<div class="stack">${card('1. 基准数据', '本地文件或内置公开示例数据集。', `<div class="file-drop" data-action="file"><div class="file-icon">${icon('file-spreadsheet')}</div><div><strong>${state.dataset.name}</strong><span>${state.dataset.source} · ${state.dataset.rows.toLocaleString()} 行 · ${state.dataset.columns} 列</span></div>${icon('chevron-right', 'subtle')}</div><div class="grid grid-2" style="margin-top:14px"><div class="field"><label>标签列</label><select id="labelSelect">${labelOptions}</select></div><div class="field"><label>数据状态</label><div style="padding-top:7px"><span class="status ok">${icon('check', '')}已识别</span></div></div></div>`)}${card('2. 模型适配器', '第一版限定为表格二分类模型。', `<div class="key-value"><span class="k">模型名称</span><span class="v">${state.model.name}</span></div><div class="key-value"><span class="k">算法</span><span class="v">${state.model.kind}</span></div><div class="key-value"><span class="k">预测接口</span><span class="v mono">predict · predict_proba</span></div><div class="key-value"><span class="k">连接状态</span><span class="status ok">${icon('check', '')}已连接</span></div>`)}<div class="note">${icon('info', '')} 性能指标只有在测试样本具有有效真实标签时才计算。发现漂移不等于确认模型性能下降。</div><button class="btn btn-primary" data-action="run" style="width:100%;justify-content:center">${icon('play')}运行实验</button><div class="progress" id="progress"><span id="progressFill"></span></div></div>`;
+      const rCards = `<div class="grid grid-4">${metricCard('基准 F1', fmt(r.baselineF1), 'Reference dataset', 'var(--green)')}${metricCard('场景 F1', fmt(r.f1), 'Scenario dataset', 'var(--orange)', `-${((r.baselineF1-r.f1)*100).toFixed(1)}pp`)}${metricCard('最大 PSI', fmt(r.psi,2), r.psi >= state.threshold ? '超过预警阈值' : '低于预警阈值', 'var(--blue)')}${metricCard('告警阈值', fmt(state.threshold,2), r.psi >= state.threshold ? '已触发' : '未触发', 'var(--orange)')}</div>`;
+      const table = `<div class="table-wrap"><table><thead><tr><th>特征</th><th>方法</th><th>分数</th><th>相对阈值</th><th>风险</th></tr></thead><tbody>${state.dataset.features.map(f => `<tr><td><strong>${f.name}</strong></td><td class="muted">${f.method}</td><td class="num mono">${f.score.toFixed(2)}</td><td><div class="bar-line"><div class="bar-track"><div class="bar" style="width:${Math.min(f.score / .3 * 100,100)}%;background:${f.score >= .2 ? 'var(--red)' : f.score >= .1 ? 'var(--orange)' : 'var(--teal)'}"></div></div><span class="small muted">${state.threshold.toFixed(2)}</span></div></td><td><span class="status ${riskClass(f.risk)}">${f.risk}</span></td></tr>`).join('')}</tbody></table></div>`;
+      return `<div class="layout-main"><div>${setup}</div><div class="stack">${rCards}${card('漂移强度与模型表现', '本次场景强度变化下，PSI 与 F1 的走势。', '<div class="chart-wrap"><canvas id="driftChart"></canvas></div>')}${card('字段漂移排行', '优先关注高权重字段和超过阈值的变化。', table, '<span class="status warn">1 个字段超过阈值</span>')}</div></div>`;
+    }
+    function renderProfile() {
+      const d = state.dataset;
+      const rows = d.features.map(f => `<tr><td><strong>${f.name}</strong></td><td><span class="status info">${f.type}</span></td><td class="num">${f.unique.toLocaleString()}</td><td class="num">${f.missing.toFixed(1)}%</td><td>${f.mean}</td><td><span class="status ok">可用</span></td></tr>`).join('');
+      return `<div class="grid grid-4" style="margin-bottom:18px">${metricCard('样本数', d.rows.toLocaleString(), '基准数据行数', 'var(--teal)')}${metricCard('字段数', d.columns, '自动识别为数值/类别', 'var(--blue)')}${metricCard('整体缺失率', d.missing.toFixed(1)+'%', '数据质量检查', 'var(--orange)')}${metricCard('重复行', d.duplicates, '建议运行前确认', 'var(--muted)')}</div><div class="grid grid-2">${card('数据质量摘要', '运行前先确认基准数据是否适合作为参照。', `<div class="key-value"><span class="k">字段类型识别</span><span class="status ok">${icon('check')}${d.features.filter(f=>f.type==='数值').length} 数值 · ${d.features.filter(f=>f.type==='类别').length} 类别</span></div><div class="key-value"><span class="k">标签列</span><span class="v mono">${d.label}</span></div><div class="key-value"><span class="k">目标比例</span><span class="v">正类 22.0% · 负类 78.0%</span></div><div class="key-value"><span class="k">检测建议</span><span class="v">PSI + KS + 卡方</span></div><div class="notice" style="margin-top:14px">画像只保存统计摘要，不代表把原始数据上传到服务端。当前页面所有数据均保留在浏览器内存。</div>`)}${card('字段画像', '每个字段的类型、缺失率和基准统计。', `<div class="table-wrap"><table><thead><tr><th>字段</th><th>类型</th><th class="num">唯一值</th><th class="num">缺失率</th><th>基准摘要</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table></div>`)}</div>`;
+    }
+    function renderScenarios() {
+      const cards = state.scenarios.map(s => `<div class="scenario-card ${s.on ? '' : 'disabled'}"><div class="scenario-top"><div class="scenario-name"><button class="toggle ${s.on ? 'on' : ''}" data-toggle="${s.id}" aria-label="切换${s.name}"></button>${s.name}</div><span class="status ${s.on ? 'info' : ''}">${s.on ? '已启用' : '未启用'}</span></div><div class="scenario-desc">${s.field} · ${s.desc}</div><div class="range-row"><input type="range" min="0" max="${s.id==='outlier'?10:30}" value="${s.value}" data-range="${s.id}" ${s.on ? '' : 'disabled'}><span class="range-value" id="range-${s.id}">${s.id==='numeric'||s.id==='category'?'+':''}${s.value}${s.unit}</span></div></div>`).join('');
+      return `<div class="grid grid-2">${card('变化类型', '基于基准数据生成场景，随机种子保证同一配置可复现。', `<div class="grid grid-2">${cards}</div><div class="grid grid-3" style="margin-top:18px"><div class="field"><label>随机种子</label><input type="number" value="42" id="seedInput"></div><div class="field"><label>场景样本数</label><input type="number" value="7043" id="sampleInput"></div><div class="field"><label>预测阈值</label><input type="number" value="0.50" step="0.05"></div></div>`, '<span class="status info">4 类变换</span>')}${card('参数说明', '第一版场景覆盖数据漂移与质量变化。', `<div class="verdict observed"><h4>数值字段</h4><p>均值偏移、方差变化和极端值注入，适用于收入、费用、时长等连续字段。</p></div><div class="verdict safe"><h4>类别字段</h4><p>按目标比例重采样，不凭空生成与基准无关的数据。</p></div><div class="verdict nolabel"><h4>结果边界</h4><p>没有真实标签时只分析输入和模型输出，不能确认 F1、Recall 或 AUC 下降。</p></div><div class="notice" style="margin-top:12px"><strong>场景配置会保存：</strong>字段、变换类型、强度和随机种子。</div>`)}<div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px"><button class="btn" data-view="profile">查看基准画像</button><button class="btn btn-primary" data-action="run">${icon('play')}运行当前场景</button></div></div>`;
+    }
+    function resultVerdicts() { const r=state.results; return `<div class="verdict observed"><h4>① 数据漂移：已检测到</h4><p>MonthlyCharges 的 PSI 为 ${r.psi.toFixed(2)}，超过 ${state.threshold.toFixed(2)} 的预警阈值，输入分布相对基准发生了变化。</p></div><div class="verdict observed"><h4>② 预测漂移：模型输出发生变化</h4><p>预测为正类的比例由 ${(r.baselinePredictionRate*100).toFixed(0)}% 变为 ${(r.predictionRate*100).toFixed(0)}%，变化 ${(r.predictionRate-r.baselinePredictionRate>0?'+':'')}${((r.predictionRate-r.baselinePredictionRate)*100).toFixed(1)}pp。</p></div><div class="verdict impact"><h4>③ 性能变化：确认下降</h4><p>F1 由 ${r.baselineF1.toFixed(3)} 变为 ${r.f1.toFixed(3)}，下降 ${((r.baselineF1-r.f1)*100).toFixed(1)}pp。因为当前数据带有有效标签，可以确认本次场景存在性能影响。</p></div><div class="verdict nolabel"><h4>④ 没有真实标签时</h4><p>只能呈现分布、缺失率、预测比例和概率变化，无法计算 F1、Recall、AUC，也无法确认性能下降。</p></div>`; }
+    function renderResults() { const r=state.results; return `<div class="grid grid-4" style="margin-bottom:18px">${metricCard('场景 F1', r.f1.toFixed(3), '相对基准下降', 'var(--red)', `-${((r.baselineF1-r.f1)*100).toFixed(1)}pp`)}${metricCard('Recall', r.recall.toFixed(3), '场景数据', 'var(--orange)')}${metricCard('ROC-AUC', r.auc.toFixed(3), '场景数据', 'var(--blue)')}${metricCard('预测正类比例', (r.predictionRate*100).toFixed(1)+'%', '基准 22.0%', 'var(--teal)')}</div><div class="grid grid-2"><div class="stack">${card('分层结论', '数据变化、输出变化和真实性能变化分别呈现。', resultVerdicts())}${card('混淆矩阵对比', '绝对数量变化帮助定位性能下降来源。', `<div class="grid grid-2"><div><div class="small muted" style="margin-bottom:8px">基准数据</div><div class="key-value"><span class="k">TP / FP</span><strong>912 / 328</strong></div><div class="key-value"><span class="k">FN / TN</span><strong>644 / 5159</strong></div></div><div><div class="small muted" style="margin-bottom:8px">场景数据</div><div class="key-value"><span class="k">TP / FP</span><strong>842 / 493</strong></div><div class="key-value"><span class="k">FN / TN</span><strong>714 / 4994</strong></div></div></div>` )}</div><div class="stack">${card('漂移强度与 F1', '压力强度提升后，漂移分数和模型表现不一定同比例变化。', '<div class="chart-wrap"><canvas id="driftChart"></canvas></div>')}${card('字段影响', '按检测分数和模型影响综合排序。', `<div class="table-wrap"><table><thead><tr><th>字段</th><th>检测器</th><th class="num">统计量</th><th>F1 影响</th><th>判定</th></tr></thead><tbody><tr><td><strong>MonthlyCharges</strong></td><td class="muted">PSI</td><td class="num mono">0.24</td><td class="num" style="color:var(--red)">-0.041</td><td><span class="status critical">高影响</span></td></tr><tr><td><strong>Contract</strong></td><td class="muted">Chi-square</td><td class="num mono">0.18</td><td class="num">-0.018</td><td><span class="status warn">需关注</span></td></tr><tr><td><strong>TotalCharges</strong></td><td class="muted">KS</td><td class="num mono">0.15</td><td class="num">-0.009</td><td><span class="status ok">轻微</span></td></tr></tbody></table></div>` )}</div></div>`; }
+    function renderCalibration() { const rows = [{t:'0.10',recall:'95%',falseAlarm:'18%',miss:'5%',state:''},{t:'0.15',recall:'91%',falseAlarm:'10%',miss:'9%',state:''},{t:'0.20',recall:'87%',falseAlarm:'5%',miss:'13%',state:'推荐'},{t:'0.25',recall:'80%',falseAlarm:'2%',miss:'20%',state:''},{t:'0.30',recall:'72%',falseAlarm:'1%',miss:'28%',state:''}]; return `<div class="grid grid-2"><div class="stack">${card('PSI 阈值校准', '把压力场景里的真实 F1 影响作为参照，比较不同阈值的取舍。', `<div class="notice"><strong>当前推荐：</strong>PSI ≥ ${state.threshold.toFixed(2)}。在本次场景集上检测召回率 87%，误报率 5%。</div><div class="chart-wrap" style="height:230px;margin-top:16px"><canvas id="calibrationChart"></canvas></div>`) }${card('阈值边界', '阈值只对当前基准数据和压力场景负责。', `<div class="field"><label>预警阈值 · PSI</label><input type="range" id="thresholdRange" min="0.05" max="0.40" step="0.01" value="${state.threshold}"><div style="display:flex;justify-content:space-between;margin-top:5px"><span class="small subtle">0.05</span><strong class="small" id="thresholdValue">${state.threshold.toFixed(2)}</strong><span class="small subtle">0.40</span></div></div><div class="notice" style="margin-top:14px">更换数据分布、样本量或模型后需要重新校准；检测延迟属于后续版本能力。</div>`)}</div>${card('误报与漏报对照', '根据当前压力场景集统计检测结果。', `<div class="table-wrap"><table><thead><tr><th>阈值</th><th class="num">检测召回</th><th class="num">误报率</th><th class="num">漏报率</th><th>建议</th></tr></thead><tbody>${rows.map(x=>`<tr style="${x.state?'background:var(--green-soft)':''}"><td class="mono">PSI ≥ ${x.t}</td><td class="num">${x.recall}</td><td class="num">${x.falseAlarm}</td><td class="num">${x.miss}</td><td>${x.state?'<span class="status ok">推荐</span>':''}</td></tr>`).join('')}</tbody></table></div><div class="verdict safe" style="margin-top:15px"><h4>推荐理由</h4><p>0.20 在检测能力和告警噪声之间取得更平衡的结果；它只表示当前实验集的经验选择，不是通用标准。</p></div>` )}</div>`; }
+    function configObject() { return { model_name: state.model.name, model_version: state.model.version, task_type: 'binary_classification', reference: { dataset: state.dataset.name, rows: state.dataset.rows, label_column: state.dataset.label, random_seed: 42 }, features: { MonthlyCharges: { method:'psi', warning_threshold: state.threshold, critical_threshold: .30 }, Contract: { method:'chi_square', warning_pvalue: .05 }, TotalCharges: { method:'ks', warning_pvalue: .05 } }, global_rules: { missing_rate_alert: .10, prediction_rate_change: .15, performance_f1_drop: .05 }, monitor_window: '1h', generated_at: '2026-11-17T10:30:00+08:00' }; }
+    function yaml(obj, indent=0) { const pad='  '.repeat(indent); return Object.entries(obj).map(([k,v]) => { if(v && typeof v==='object' && !Array.isArray(v)) return `${pad}${k}:\n${yaml(v,indent+1)}`; return `${pad}${k}: ${typeof v==='string' ? `'${v}'` : v}`; }).join('\n'); }
+    function renderExport() { const data = configObject(); const code = state.exportTab==='yaml' ? yaml(data) : JSON.stringify(data,null,2); return `<div class="grid grid-2"><div class="stack">${card('监控配置', '将离线校准结果带到后续线上监控服务。', `<div class="key-value"><span class="k">配置状态</span><span class="status ok">${icon('check')}已生成</span></div><div class="key-value"><span class="k">模型</span><strong>${state.model.name} / ${state.model.version}</strong></div><div class="key-value"><span class="k">监控窗口</span><strong>1h</strong></div><div class="key-value"><span class="k">检测字段</span><strong>3 个</strong></div><div class="key-value"><span class="k">原始数据</span><span class="status ok">未包含</span></div><div class="key-value"><span class="k">模型权重</span><span class="status ok">未包含</span></div><div class="notice" style="margin-top:14px">配置中的阈值来自本次离线压力测试，换数据后需要重新运行实验和校准。</div><div style="display:flex;gap:8px;margin-top:15px"><button class="btn btn-primary" data-download="${state.exportTab}">${icon('download')}下载 ${state.exportTab.toUpperCase()}</button><button class="btn" data-copy="true">${icon('copy')}复制</button></div>`) }${card('配置包含的规则', '对线上使用者保持最小必要信息。', `<div class="verdict observed"><h4>字段检测</h4><p>MonthlyCharges 使用 PSI，Contract 使用卡方检验，TotalCharges 使用 KS 检验。</p></div><div class="verdict safe"><h4>全局告警</h4><p>缺失率、预测正类比例变化和 F1 下降分别设置独立规则。</p></div>`)}</div>${card('导出内容', 'JSON 便于程序读取，YAML 便于人工审阅。', `<div class="export-tabs"><button class="export-tab ${state.exportTab==='yaml'?'active':''}" data-export-tab="yaml">YAML</button><button class="export-tab ${state.exportTab==='json'?'active':''}" data-export-tab="json">JSON</button></div><pre class="export-code" style="margin-top:11px">${escapeHtml(code)}</pre>`)}</div>`; }
+    function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+    function drawChart() { const el=document.getElementById('driftChart'); if(!el || !window.Chart) return; chart=new Chart(el,{type:'line',data:{labels:['0%','+5%','+10%','+15%','+20%','+25%','+30%'],datasets:[{label:'模型 F1',data:[.842,.838,.831,.822,.801,.789,.772],borderColor:'#15855d',backgroundColor:'rgba(21,133,93,.08)',fill:true,tension:.35,borderWidth:2.3,pointRadius:2.5},{label:'PSI',data:[0,.05,.11,.17,.24,.32,.41],borderColor:'#3c70c8',borderDash:[6,4],tension:.35,borderWidth:2,pointRadius:2},{label:'告警阈值',data:Array(7).fill(state.threshold),borderColor:'#b97812',borderDash:[4,4],borderWidth:1.5,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top',align:'end',labels:{boxWidth:9,boxHeight:9,usePointStyle:true,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{min:0,max:1,grid:{color:'#edf1ee'},ticks:{font:{size:10}}}}}}); }
+    function drawCalibration() { const el=document.getElementById('calibrationChart'); if(!el || !window.Chart) return; chart=new Chart(el,{type:'line',data:{labels:['0.10','0.15','0.20','0.25','0.30'],datasets:[{label:'检测召回',data:[.95,.91,.87,.80,.72],borderColor:'#15855d',tension:.3,borderWidth:2,pointRadius:3},{label:'误报率',data:[.18,.10,.05,.02,.01],borderColor:'#c74845',tension:.3,borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',align:'end',labels:{boxWidth:9,boxHeight:9,usePointStyle:true,font:{size:11}}}},scales:{x:{grid:{display:false},title:{display:true,text:'PSI 阈值',font:{size:10}}},y:{min:0,max:1,grid:{color:'#edf1ee'},ticks:{callback:v=>`${v*100}%`,font:{size:10}}}}}}); }
+    function runExperiment() { const buttons=document.querySelectorAll('[data-action="run"]'); buttons.forEach(b=>{b.disabled=true;b.innerHTML=`${icon('loader')}运行中...`}); const bar=document.getElementById('progress'); const fill=document.getElementById('progressFill'); if(bar){bar.style.display='block';fill.style.width='0%';} let p=0; const timer=setInterval(()=>{p+=20;if(fill)fill.style.width=p+'%';if(p>=100){clearInterval(timer); state.results.ran=true; const active=state.scenarios.filter(s=>s.on).length; state.results.psi=Math.min(.12+active*.04+state.scenarios.find(s=>s.id==='numeric').value*.004,.52); state.results.f1=Math.max(.72,state.results.baselineF1-(state.results.psi*.14)); state.results.recall=Math.max(.68,state.results.f1-.027); state.results.auc=Math.max(.76,.884-state.results.psi*.16); render(); toast('压力测试完成，结果已更新');}},180); }
+    function parseCsv(text) { const lines=text.trim().split(/\r?\n/).filter(Boolean); if(lines.length<2) throw new Error('CSV 至少需要包含表头和一行数据'); const split=line=>line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(v=>v.replace(/^\"|\"$/g,'').trim()); const headers=split(lines[0]); const values=lines.slice(1, Math.min(lines.length, 1001)).map(split); const features=headers.map((h,i)=>{const vals=values.map(r=>r[i]).filter(v=>v!==undefined&&v!=='');const numeric=vals.length>0&&vals.every(v=>!Number.isNaN(Number(v)));const unique=new Set(vals).size;const miss=values.length?((values.length-vals.length)/values.length*100):0;return {name:h,type:numeric?'数值':'类别',unique,missing:miss,mean:numeric?(vals.reduce((a,v)=>a+Number(v),0)/vals.length).toFixed(2):(vals[0]||'-'),method:numeric?'PSI':'Chi-square',score:0,risk:'轻微'};}); return {name:'已导入 · '+headers.join('_').slice(0,30)+'.csv',rows:lines.length-1,columns:headers.length,label:headers[headers.length-1],headers,missing:features.reduce((a,f)=>a+f.missing,0)/features.length,duplicates:0,source:'本地 CSV',features}; }
+    document.addEventListener('click', e => { const nav=e.target.closest('[data-view]'); if(nav){state.view=nav.dataset.view;render();return;} const act=e.target.closest('[data-action]'); if(act){const a=act.dataset.action;if(a==='run'){runExperiment();return;}if(a==='export'){state.view='export';render();return;}if(a==='file'){document.getElementById('csvInput').click();return;}} const toggle=e.target.closest('[data-toggle]'); if(toggle){const s=state.scenarios.find(x=>x.id===toggle.dataset.toggle);s.on=!s.on;render();return;} const tab=e.target.closest('[data-export-tab]'); if(tab){state.exportTab=tab.dataset.exportTab;render();return;} const copy=e.target.closest('[data-copy]'); if(copy){const text=state.exportTab==='yaml'?yaml(configObject()):JSON.stringify(configObject(),null,2);navigator.clipboard?.writeText(text).then(()=>toast('配置已复制')).catch(()=>toast('浏览器未授权剪贴板'));return;} const dl=e.target.closest('[data-download]'); if(dl){const ext=dl.dataset.download;const text=ext==='yaml'?yaml(configObject()):JSON.stringify(configObject(),null,2);const blob=new Blob([text],{type:ext==='yaml'?'text/yaml':'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`driftsentinel-monitor.${ext}`;a.click();URL.revokeObjectURL(a.href);toast(`已下载 ${ext.toUpperCase()} 配置`);return;} });
+    document.addEventListener('input', e => { const range=e.target.closest('[data-range]'); if(range){const s=state.scenarios.find(x=>x.id===range.dataset.range);s.value=Number(range.value);const out=document.getElementById('range-'+s.id);if(out)out.textContent=(s.id==='numeric'||s.id==='category'?'+':'')+s.value+s.unit;} if(e.target.id==='thresholdRange'){state.threshold=Number(e.target.value);const out=document.getElementById('thresholdValue');if(out)out.textContent=state.threshold.toFixed(2);} });
+    document.addEventListener('change', e => { if(e.target.id==='labelSelect'){state.dataset.label=e.target.value;toast(`标签列已切换为 ${state.dataset.label}`);} });
+    document.getElementById('csvInput').addEventListener('change', e => { const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{state.dataset=parseCsv(ev.target.result);render();toast(`已导入 ${state.dataset.rows.toLocaleString()} 行 CSV`);}catch(err){toast(err.message);}e.target.value='';};reader.readAsText(file); });
+    document.getElementById('resetBtn').addEventListener('click',()=>{location.reload();});
+    render();
+  </script>
+</body>
+</html>

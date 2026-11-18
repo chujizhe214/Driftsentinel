@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DriftSentinel · 压力测试向导</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --panel-2:#f1f3f6; --panel-3:#e9edf2;
+  --border:#e2e6ec; --border-2:#cfd6df;
+  --text:#1f2328; --text-2:#5a6572; --text-3:#8a95a3;
+  --indigo:#5850ec; --indigo-soft:#eeedfd;
+  --orange:#d9711e; --orange-soft:#fdf0e5;
+  --green:#1a7f4b; --green-soft:#e5f5ec;
+  --amber:#a66b00; --amber-soft:#fdf3e0;
+  --red:#c9352b; --red-soft:#fdecea;
+  --mono:'SF Mono',Menlo,Consolas,'Cascadia Code',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font:14px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- 顶栏 ---------- */
+.topbar{
+  background:var(--panel);border-bottom:1px solid var(--border);
+  padding:0 32px;position:sticky;top:0;z-index:30;
+}
+.topbar-inner{
+  max-width:1240px;margin:0 auto;height:62px;
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo .mark{
+  width:28px;height:28px;border-radius:8px;background:var(--indigo);color:#fff;
+  display:grid;place-items:center;font-size:12px;font-weight:700;
+}
+.logo h1{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.logo .sub{font-size:11.5px;color:var(--text-3);margin-left:2px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.btn{
+  padding:7px 15px;border-radius:8px;border:1px solid var(--border-2);
+  background:var(--panel);color:var(--text);font-size:12.5px;transition:.13s;
+}
+.btn:hover{background:var(--panel-2);border-color:var(--text-3)}
+.btn.primary{background:var(--indigo);border-color:var(--indigo);color:#fff;font-weight:500}
+.btn.primary:hover{background:#4a41d8;border-color:#4a41d8}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn.ghost:hover{background:var(--panel-2);border-color:var(--panel-2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- 步骤条 ---------- */
+.wizard-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:18px 32px 16px}
+.wizard-inner{max-width:1240px;margin:0 auto}
+.steps{display:flex;align-items:flex-start}
+.step-item{flex:1;text-align:center;position:relative;cursor:pointer}
+.step-item .bar{
+  position:absolute;top:13px;left:50%;right:-50%;height:2px;background:var(--border-2);z-index:0;
+}
+.step-item:last-child .bar{display:none}
+.step-item.done .bar{background:var(--indigo)}
+.step-item .dot{
+  width:28px;height:28px;border-radius:50%;background:var(--panel);
+  border:2px solid var(--border-2);color:var(--text-3);
+  display:inline-grid;place-items:center;font-size:12px;font-weight:600;
+  position:relative;z-index:1;transition:.15s;font-family:var(--mono);
+}
+.step-item.done .dot{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.step-item.current .dot{border-color:var(--indigo);color:var(--indigo);background:var(--indigo-soft)}
+.step-item.current .dot{box-shadow:0 0 0 4px var(--indigo-soft)}
+.step-item .lbl{font-size:12px;color:var(--text-3);margin-top:7px;font-weight:500}
+.step-item.current .lbl{color:var(--indigo);font-weight:600}
+.step-item.done .lbl{color:var(--text-2)}
+.step-item:hover .dot{border-color:var(--indigo)}
+.progress-note{font-size:11.5px;color:var(--text-3);text-align:center;margin-top:12px}
+
+/* ---------- 主区 ---------- */
+.wrap{max-width:1240px;margin:0 auto;padding:32px 32px 0}
+.page-head{margin-bottom:24px}
+.page-head h2{font-size:24px;font-weight:600;letter-spacing:-.5px}
+.page-head p{font-size:14px;color:var(--text-2);margin-top:8px;max-width:78ch;line-height:1.7}
+.card{
+  background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  padding:24px;margin-bottom:20px;
+}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.card-head h3{font-size:15px;font-weight:600}
+.card-head p{font-size:12.5px;color:var(--text-3);margin-top:4px;max-width:76ch;line-height:1.6}
+.grid{display:grid;gap:20px;align-items:start}
+.g2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+
+/* ---------- 指标 ---------- */
+.stat{background:var(--panel-2);border-radius:10px;padding:16px 18px}
+.stat .lbl{font-size:12px;color:var(--text-2);margin-bottom:7px}
+.stat .val{font-size:26px;font-weight:600;font-family:var(--mono);letter-spacing:-.6px;line-height:1.15}
+.stat .hint{font-size:11.5px;color:var(--text-3);margin-top:6px}
+.good{color:var(--green)} .bad{color:var(--red)} .flat{color:var(--text-3)} .shift{color:var(--amber)}
+.muted{color:var(--text-3)}
+
+/* ---------- 表格 ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{
+  text-align:left;padding:10px 12px;font-weight:500;color:var(--text-2);
+  border-bottom:1px solid var(--border-2);font-size:12px;white-space:nowrap;
+  background:var(--panel-2);
+}
+td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--panel-2)}
+.num-cell{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto;border-radius:8px}
+.tbl-wrap table{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+
+/* ---------- 标签 ---------- */
+.tag{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;
+  font-size:11.5px;font-weight:500;white-space:nowrap;
+}
+.t-ok{background:var(--green-soft);color:var(--green)}
+.t-warn{background:var(--amber-soft);color:var(--amber)}
+.t-crit{background:var(--red-soft);color:var(--red)}
+.t-info{background:var(--indigo-soft);color:var(--indigo)}
+.t-neutral{background:var(--panel-3);color:var(--text-2)}
+.t-orange{background:var(--orange-soft);color:var(--orange)}
+
+/* ---------- 表单 ---------- */
+.field{margin-bottom:18px}
+.field label{display:block;font-size:13px;font-weight:500;margin-bottom:7px}
+.field .help{font-size:12px;color:var(--text-3);margin-top:6px;line-height:1.55}
+input[type=text],select,textarea{
+  width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border-2);
+  background:var(--panel);color:var(--text);font-size:13px;font-family:inherit;
+}
+input:focus,select:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-soft)}
+textarea{font-family:var(--mono);font-size:12px;line-height:1.6}
+.upload-zone{
+  border:2px dashed var(--border-2);border-radius:12px;padding:34px 24px;text-align:center;
+  background:var(--panel-2);transition:.15s;
+}
+.upload-zone:hover{border-color:var(--indigo);background:var(--indigo-soft)}
+.upload-zone .icon{font-size:26px;margin-bottom:10px}
+.upload-zone h4{font-size:14px;font-weight:600;margin-bottom:6px}
+.upload-zone p{font-size:12.5px;color:var(--text-3)}
+
+/* ---------- 场景卡片 ---------- */
+.scenario-card{
+  border:1px solid var(--border-2);border-radius:12px;padding:16px 18px;
+  background:var(--panel);cursor:pointer;transition:.15s;position:relative;
+}
+.scenario-card:hover{border-color:var(--indigo)}
+.scenario-card.on{border-color:var(--indigo);background:var(--indigo-soft);box-shadow:0 0 0 2px var(--indigo-soft)}
+.scenario-card h4{font-size:13.5px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.scenario-card p{font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:10px}
+.scenario-card .meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.check{
+  position:absolute;top:14px;right:14px;width:18px;height:18px;border-radius:5px;
+  border:1.5px solid var(--border-2);display:grid;place-items:center;font-size:11px;color:transparent;
+}
+.scenario-card.on .check{background:var(--indigo);border-color:var(--indigo);color:#fff}
+
+/* ---------- 结论 ---------- */
+.verdict{border-left:3px solid var(--border-2);padding:4px 0 4px 16px;margin-bottom:18px}
+.verdict:last-child{margin-bottom:0}
+.verdict h4{font-size:13.5px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.verdict p{font-size:13px;color:var(--text-2);line-height:1.75}
+.verdict.observed{border-color:var(--indigo)}
+.verdict.impact{border-color:var(--red)}
+.verdict.safe{border-color:var(--green)}
+.verdict.nolabel{border-color:var(--amber)}
+
+.notice{
+  background:var(--amber-soft);border:1px solid #f0dcc0;border-radius:10px;
+  padding:14px 16px;font-size:13px;color:#7a4a00;line-height:1.7;
+}
+.notice.info{background:var(--indigo-soft);border-color:#dcd8fa;color:#3d3590}
+.notice strong{color:inherit;font-weight:600}
+
+/* ---------- 代码 ---------- */
+pre{
+  background:#f8f9fb;border:1px solid var(--border);border-radius:10px;
+  padding:16px 18px;overflow:auto;font-family:var(--mono);font-size:12px;
+  line-height:1.65;color:#2d3748;max-height:400px;
+}
+
+/* ---------- 图表 ---------- */
+.chart{width:100%}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px;font-size:12px;color:var(--text-2)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:3px;display:block}
+
+/* ---------- 混淆矩阵 ---------- */
+.cm{display:grid;grid-template-columns:56px repeat(2,1fr);gap:5px;font-size:12px;max-width:380px}
+.cm .hd{color:var(--text-3);font-size:11.5px;text-align:center;padding:5px}
+.cm .lbl{color:var(--text-3);font-size:11.5px;display:grid;place-items:center;text-align:right;padding-right:8px}
+.cm .cell{padding:16px 8px;border-radius:9px;text-align:center;font-family:var(--mono);font-size:17px;font-weight:600}
+.cm .cell small{display:block;font-size:10.5px;font-weight:400;opacity:.8;margin-top:4px;font-family:inherit}
+.cm .tp{background:var(--green-soft);color:var(--green)}
+.cm .fp{background:var(--red-soft);color:var(--red)}
+.cm .fn{background:var(--amber-soft);color:var(--amber)}
+.cm .tn{background:var(--indigo-soft);color:var(--indigo)}
+
+.kv{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--text-2)}
+.kv .v{font-family:var(--mono);text-align:right}
+hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
+
+/* ---------- 底部导航 ---------- */
+.footnav{
+  position:sticky;bottom:0;background:rgba(246,247,249,.92);backdrop-filter:blur(10px);
+  border-top:1px solid var(--border);margin-top:28px;
+}
+.footnav-inner{
+  max-width:1240px;margin:0 auto;padding:16px 32px;
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+}
+.footnav .hint{font-size:12.5px;color:var(--text-3)}
+.footnav .actions{display:flex;gap:10px}
+
+.pill-row{display:flex;gap:8px;flex-wrap:wrap}
+.pill{
+  padding:6px 13px;border-radius:20px;border:1px solid var(--border-2);
+  background:var(--panel);font-size:12.5px;color:var(--text-2);
+}
+.pill.on{background:var(--indigo-soft);border-color:var(--indigo);color:var(--indigo);font-weight:500}
+
+@media(max-width:900px){
+  .wrap,.topbar-inner,.footnav-inner{padding-left:18px;padding-right:18px}
+  .step-item .lbl{font-size:10.5px}
+  .page-head h2{font-size:20px}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo">
+      <span class="mark">DS</span>
+      <h1>DriftSentinel</h1>
+      <span class="sub">压力测试向导</span>
+    </div>
+    <div class="top-actions">
+      <span class="tag t-ok">本地运行</span>
+      <button class="btn ghost" onclick="go('report')">查看报告</button>
+      <button class="btn primary" onclick="downloadCfg()">导出配置</button>
+    </div>
+  </div>
+</header>
+
+<div class="wizard-bar">
+  <div class="wizard-inner">
+    <div class="steps" id="steps"></div>
+    <div class="progress-note" id="progressNote"></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div id="content"></div>
+</main>
+
+<footer class="footnav">
+  <div class="footnav-inner">
+    <div class="hint" id="footHint"></div>
+    <div class="actions">
+      <button class="btn" id="btnPrev" onclick="prev()">上一步</button>
+      <button class="btn primary" id="btnNext" onclick="next()">下一步</button>
+    </div>
+  </div>
+</footer>
+
+<script>
+const DATA = {"meta":{"n_rows":4000,"seed":42,"generated_at":"2026-11-13"},"numeric_fields":["age","income","tenure_months","support_tickets","last_login_days"],"categorical_levels":{"city":["北京","上海","深圳","广州","成都","其他"],"plan":["基础","标准","尊享"],"device":["iOS","Android","Web"]},"label":"churn","duplicate_ratio":0.0,"profile":[{"field":"age","dtype":"numeric","dtype_label":"数值","missing":0.0,"unique":4000,"mean":41.3,"std":12.7,"q25":32.81,"q50":41.01,"q75":49.68,"min":-3.83,"max":89.44,"monitor":"PSI + KS"},{"field":"income","dtype":"numeric","dtype_label":"数值","missing":0.0057,"unique":3977,"mean":7800.0,"std":3200.0,"q25":5721.26,"q50":7827.25,"q75":9902.94,"min":-3897.35,"max":20144.28,"monitor":"PSI + KS"},{"field":"tenure_months","dtype":"numeric","dtype_label":"数值","missing":0.0,"unique":4000,"mean":26.5,"std":14.2,"q25":17.06,"q50":26.57,"q75":36.25,"min":-35.51,"max":82.95,"monitor":"PSI + KS"},{"field":"support_tickets","dtype":"numeric","dtype_label":"数值","missing":0.0592,"unique":3763,"mean":3.4,"std":2.1,"q25":1.94,"q50":3.37,"q75":4.79,"min":-4.38,"max":10.7,"monitor":"PSI + KS"},{"field":"last_login_days","dtype":"numeric","dtype_label":"数值","missing":0.0,"unique":4000,"mean":11.2,"std":9.5,"q25":5.09,"q50":11.54,"q75":18.05,"min":-20.52,"max":51.76,"monitor":"PSI + KS"},{"field":"city","dtype":"categorical","dtype_label":"类别","missing":0.0195,"unique":7,"levels":[{"level":"北京","ratio":0.2485,"count":994},{"level":"上海","ratio":0.2218,"count":887},{"level":"深圳","ratio":0.1648,"count":659},{"level":"广州","ratio":0.149,"count":596},{"level":"成都","ratio":0.1185,"count":474},{"level":"其他","ratio":0.078,"count":312}],"monitor":"PSI + 卡方检验"},{"field":"plan","dtype":"categorical","dtype_label":"类别","missing":0.0,"unique":3,"levels":[{"level":"基础","ratio":0.4517,"count":1807},{"level":"标准","ratio":0.3503,"count":1401},{"level":"尊享","ratio":0.198,"count":792}],"monitor":"PSI + 卡方检验"},{"field":"device","dtype":"categorical","dtype_label":"类别","missing":0.0,"unique":3,"levels":[{"level":"iOS","ratio":0.3827,"count":1531},{"level":"Android","ratio":0.4572,"count":1829},{"level":"Web","ratio":0.16,"count":640}],"monitor":"PSI + 卡方检验"}],"model":{"name":"demo_churn_classifier","version":"v1.0.0","algorithm":"LogisticRegression (L2)","features":17,"train_samples":4000,"seed":42,"threshold":0.5,"train_accuracy":0.8177,"coef":{"age":0.2497,"income":-0.5286,"tenure_months":-0.9849,"support_tickets":1.3566,"last_login_days":1.118,"city=北京":-0.4598,"city=上海":-0.2757,"city=深圳":-0.1563,"city=广州":-0.3395,"city=成都":0.177,"city=其他":0.2254,"plan=基础":0.2165,"plan=标准":-0.3434,"plan=尊享":-0.7475,"device=iOS":-0.3912,"device=Android":-0.2397,"device=Web":-0.2436},"intercept":-0.8745,"adapter":"model_adapters/demo_classifier.py"},"baseline":{"metrics":{"accuracy":0.8177,"precision":0.7207,"recall":0.5914,"f1":0.6497,"auc":0.8759,"tp":676,"fp":262,"tn":2595,"fn":467,"pred_pos_rate":0.2345,"actual_pos_rate":0.2858},"confusion":{"tp":676,"fp":262,"tn":2595,"fn":467},"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0025,"tpr":0.1391},{"fpr":0.0109,"tpr":0.2633},{"fpr":0.027,"tpr":0.3683},{"fpr":0.0459,"tpr":0.4663},{"fpr":0.0732,"tpr":0.5433},{"fpr":0.1036,"tpr":0.6124},{"fpr":0.1358,"tpr":0.6772},{"fpr":0.1666,"tpr":0.7454},{"fpr":0.2069,"tpr":0.79},{"fpr":0.2485,"tpr":0.8311},{"fpr":0.2937,"tpr":0.8635},{"fpr":0.3392,"tpr":0.895},{"fpr":0.3889,"tpr":0.916},{"fpr":0.4382,"tpr":0.9379},{"fpr":0.4904,"tpr":0.9528},{"fpr":0.5418,"tpr":0.9694},{"fpr":0.5975,"tpr":0.9755},{"fpr":0.6528,"tpr":0.9825},{"fpr":0.7081,"tpr":0.9895},{"fpr":0.7637,"tpr":0.9956},{"fpr":0.8211,"tpr":0.9974},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}]},"scenarios":[{"id":"control","name":"对照组（无变化）","kind":"control","field":"—","desc":"完全相同的基准数据重复跑一次，用于测量检测器自身的误报基线。","method":"PSI","intensity":0.0,"metrics":{"accuracy":0.8177,"precision":0.7207,"recall":0.5914,"f1":0.6497,"auc":0.8759,"tp":676,"fp":262,"tn":2595,"fn":467,"pred_pos_rate":0.2345,"actual_pos_rate":0.2858},"confusion":{"tp":676,"fp":262,"tn":2595,"fn":467},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0025,"tpr":0.1391},{"fpr":0.0109,"tpr":0.2633},{"fpr":0.027,"tpr":0.3683},{"fpr":0.0459,"tpr":0.4663},{"fpr":0.0732,"tpr":0.5433},{"fpr":0.1036,"tpr":0.6124},{"fpr":0.1358,"tpr":0.6772},{"fpr":0.1666,"tpr":0.7454},{"fpr":0.2069,"tpr":0.79},{"fpr":0.2485,"tpr":0.8311},{"fpr":0.2937,"tpr":0.8635},{"fpr":0.3392,"tpr":0.895},{"fpr":0.3889,"tpr":0.916},{"fpr":0.4382,"tpr":0.9379},{"fpr":0.4904,"tpr":0.9528},{"fpr":0.5418,"tpr":0.9694},{"fpr":0.5975,"tpr":0.9755},{"fpr":0.6528,"tpr":0.9825},{"fpr":0.7081,"tpr":0.9895},{"fpr":0.7637,"tpr":0.9956},{"fpr":0.8211,"tpr":0.9974},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"psi","field":"income"}},{"id":"income_mild","name":"income 均值 +10%","kind":"income_shift","field":"income","desc":"income 整体乘以 1.10，均值 7,800 → 8,580，轻度购买力上移。","method":"PSI","intensity":0.5,"metrics":{"accuracy":0.8175,"precision":0.741,"recall":0.5556,"f1":0.635,"auc":0.8758,"tp":635,"fp":222,"tn":2635,"fn":508,"pred_pos_rate":0.2142,"actual_pos_rate":0.2858},"confusion":{"tp":635,"fp":222,"tn":2635,"fn":508},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.074,"ks":0.1084,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0025,"tpr":0.1391},{"fpr":0.0105,"tpr":0.2642},{"fpr":0.0266,"tpr":0.3692},{"fpr":0.0462,"tpr":0.4654},{"fpr":0.0725,"tpr":0.5451},{"fpr":0.1029,"tpr":0.6142},{"fpr":0.1358,"tpr":0.6772},{"fpr":0.1687,"tpr":0.7402},{"fpr":0.2076,"tpr":0.7883},{"fpr":0.2499,"tpr":0.8276},{"fpr":0.294,"tpr":0.8626},{"fpr":0.3381,"tpr":0.8976},{"fpr":0.3875,"tpr":0.9195},{"fpr":0.4389,"tpr":0.9361},{"fpr":0.49,"tpr":0.9536},{"fpr":0.5418,"tpr":0.9694},{"fpr":0.5975,"tpr":0.9755},{"fpr":0.6531,"tpr":0.9816},{"fpr":0.7084,"tpr":0.9886},{"fpr":0.7634,"tpr":0.9965},{"fpr":0.8208,"tpr":0.9983},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"psi","field":"income"}},{"id":"income_shift","name":"income 均值 +20%","kind":"income_shift","field":"income","desc":"income 整体乘以 1.20，均值 7,800 → 9,360，模拟用户群购买力上移或采集口径变化。","method":"PSI","intensity":1.0,"metrics":{"accuracy":0.8173,"precision":0.7575,"recall":0.5302,"f1":0.6238,"auc":0.8754,"tp":606,"fp":194,"tn":2663,"fn":537,"pred_pos_rate":0.2,"actual_pos_rate":0.2858},"confusion":{"tp":606,"fp":194,"tn":2663,"fn":537},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.2628,"ks":0.1976,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0028,"tpr":0.1382},{"fpr":0.0112,"tpr":0.2625},{"fpr":0.0266,"tpr":0.3692},{"fpr":0.0469,"tpr":0.4637},{"fpr":0.0721,"tpr":0.5459},{"fpr":0.1019,"tpr":0.6168},{"fpr":0.1355,"tpr":0.678},{"fpr":0.1694,"tpr":0.7384},{"fpr":0.2076,"tpr":0.7883},{"fpr":0.2513,"tpr":0.8241},{"fpr":0.2951,"tpr":0.86},{"fpr":0.3378,"tpr":0.8985},{"fpr":0.3885,"tpr":0.9169},{"fpr":0.4389,"tpr":0.9361},{"fpr":0.4904,"tpr":0.9528},{"fpr":0.5418,"tpr":0.9694},{"fpr":0.5978,"tpr":0.9746},{"fpr":0.6531,"tpr":0.9816},{"fpr":0.7081,"tpr":0.9895},{"fpr":0.7637,"tpr":0.9956},{"fpr":0.8208,"tpr":0.9983},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"psi","field":"income"}},{"id":"income_hard","name":"income 均值 +30%","kind":"income_shift","field":"income","desc":"income 整体乘以 1.30，均值 7,800 → 10,140，强烈漂移。","method":"PSI","intensity":1.5,"metrics":{"accuracy":0.816,"precision":0.7754,"recall":0.5013,"f1":0.6089,"auc":0.8748,"tp":573,"fp":166,"tn":2691,"fn":570,"pred_pos_rate":0.1847,"actual_pos_rate":0.2858},"confusion":{"tp":573,"fp":166,"tn":2691,"fn":570},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.5376,"ks":0.2784,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0028,"tpr":0.1382},{"fpr":0.0109,"tpr":0.2633},{"fpr":0.0273,"tpr":0.3675},{"fpr":0.0487,"tpr":0.4593},{"fpr":0.0725,"tpr":0.5451},{"fpr":0.1026,"tpr":0.615},{"fpr":0.1351,"tpr":0.6789},{"fpr":0.1715,"tpr":0.7332},{"fpr":0.209,"tpr":0.7848},{"fpr":0.2506,"tpr":0.8259},{"fpr":0.2958,"tpr":0.8583},{"fpr":0.3392,"tpr":0.895},{"fpr":0.3878,"tpr":0.9186},{"fpr":0.4393,"tpr":0.9353},{"fpr":0.4907,"tpr":0.9519},{"fpr":0.5418,"tpr":0.9694},{"fpr":0.5978,"tpr":0.9746},{"fpr":0.6528,"tpr":0.9825},{"fpr":0.7084,"tpr":0.9886},{"fpr":0.7641,"tpr":0.9948},{"fpr":0.8208,"tpr":0.9983},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"psi","field":"income"}},{"id":"age_variance","name":"age 方差扩大 1.5x","kind":"age_variance","field":"age","desc":"age 以均值 41.3 为中心放大到 1.5 倍标准差，用户年龄结构变得离散。","method":"KS","intensity":1.0,"metrics":{"accuracy":0.816,"precision":0.7163,"recall":0.5897,"f1":0.6468,"auc":0.8754,"tp":674,"fp":267,"tn":2590,"fn":469,"pred_pos_rate":0.2352,"actual_pos_rate":0.2858},"confusion":{"tp":674,"fp":267,"tn":2590,"fn":469},"fields":[{"field":"age","type":"numeric","psi":0.2853,"ks":0.1052,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0028,"tpr":0.1382},{"fpr":0.0112,"tpr":0.2625},{"fpr":0.0263,"tpr":0.3701},{"fpr":0.0469,"tpr":0.4637},{"fpr":0.0728,"tpr":0.5442},{"fpr":0.1043,"tpr":0.6107},{"fpr":0.1351,"tpr":0.6789},{"fpr":0.1687,"tpr":0.7402},{"fpr":0.2083,"tpr":0.7865},{"fpr":0.2471,"tpr":0.8346},{"fpr":0.2937,"tpr":0.8635},{"fpr":0.3388,"tpr":0.8959},{"fpr":0.3878,"tpr":0.9186},{"fpr":0.4386,"tpr":0.937},{"fpr":0.4897,"tpr":0.9545},{"fpr":0.5418,"tpr":0.9694},{"fpr":0.5971,"tpr":0.9764},{"fpr":0.6535,"tpr":0.9808},{"fpr":0.7081,"tpr":0.9895},{"fpr":0.7634,"tpr":0.9965},{"fpr":0.8211,"tpr":0.9974},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"ks","field":"age"}},{"id":"city_shift","name":"city 比例重分配","kind":"city_shift","field":"city","desc":"city=北京 占比 25% → 60%，渠道/地区结构剧烈变化。","method":"卡方检验","intensity":1.0,"metrics":{"accuracy":0.816,"precision":0.7386,"recall":0.5512,"f1":0.6313,"auc":0.8708,"tp":630,"fp":223,"tn":2634,"fn":513,"pred_pos_rate":0.2132,"actual_pos_rate":0.2858},"confusion":{"tp":630,"fp":223,"tn":2634,"fn":513},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.5317,"chi2":1005.423,"pvalue":2.0100705365492448e-215,"levels":[{"level":"北京","ref":0.2485,"cur":0.5988},{"level":"上海","ref":0.2218,"cur":0.1522},{"level":"深圳","ref":0.1648,"cur":0.096},{"level":"广州","ref":0.149,"cur":0.0595},{"level":"成都","ref":0.1185,"cur":0.0512},{"level":"其他","ref":0.078,"cur":0.0423}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0035,"tpr":0.1365},{"fpr":0.0116,"tpr":0.2616},{"fpr":0.0277,"tpr":0.3666},{"fpr":0.0483,"tpr":0.4602},{"fpr":0.0746,"tpr":0.5398},{"fpr":0.1036,"tpr":0.6124},{"fpr":0.1369,"tpr":0.6745},{"fpr":0.1715,"tpr":0.7332},{"fpr":0.2125,"tpr":0.776},{"fpr":0.251,"tpr":0.825},{"fpr":0.2972,"tpr":0.8548},{"fpr":0.3423,"tpr":0.8871},{"fpr":0.3903,"tpr":0.9125},{"fpr":0.4396,"tpr":0.9344},{"fpr":0.4911,"tpr":0.951},{"fpr":0.5443,"tpr":0.9633},{"fpr":0.5971,"tpr":0.9764},{"fpr":0.6528,"tpr":0.9825},{"fpr":0.7084,"tpr":0.9886},{"fpr":0.7637,"tpr":0.9956},{"fpr":0.8208,"tpr":0.9983},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"chi_square","field":"city"}},{"id":"plan_shift","name":"plan 结构变化","kind":"plan_shift","field":"plan","desc":"plan=尊享 占比 20% → 40%，基础 45% → 25%。","method":"卡方检验","intensity":1.0,"metrics":{"accuracy":0.8075,"precision":0.7207,"recall":0.5328,"f1":0.6127,"auc":0.8627,"tp":609,"fp":236,"tn":2621,"fn":534,"pred_pos_rate":0.2112,"actual_pos_rate":0.2858},"confusion":{"tp":609,"fp":236,"tn":2621,"fn":534},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.2681,"chi2":517.263,"pvalue":2.3809666031681568e-113,"levels":[{"level":"基础","ref":0.4517,"cur":0.2522},{"level":"标准","ref":0.3503,"cur":0.34},{"level":"尊享","ref":0.198,"cur":0.4078}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0032,"tpr":0.1374},{"fpr":0.0158,"tpr":0.2511},{"fpr":0.0301,"tpr":0.3605},{"fpr":0.0529,"tpr":0.4488},{"fpr":0.0798,"tpr":0.5267},{"fpr":0.1085,"tpr":0.6002},{"fpr":0.1393,"tpr":0.6684},{"fpr":0.1764,"tpr":0.7209},{"fpr":0.2153,"tpr":0.769},{"fpr":0.2552,"tpr":0.8145},{"fpr":0.3,"tpr":0.8478},{"fpr":0.3486,"tpr":0.8714},{"fpr":0.3948,"tpr":0.9011},{"fpr":0.4431,"tpr":0.9256},{"fpr":0.4921,"tpr":0.9484},{"fpr":0.5446,"tpr":0.9624},{"fpr":0.5985,"tpr":0.9729},{"fpr":0.6531,"tpr":0.9816},{"fpr":0.7084,"tpr":0.9886},{"fpr":0.7655,"tpr":0.9913},{"fpr":0.8211,"tpr":0.9974},{"fpr":0.8789,"tpr":0.9983},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"chi_square","field":"plan"}},{"id":"missing_up","name":"缺失率提升至 20%","kind":"missing_up","field":"support_tickets","desc":"support_tickets 缺失率 5.9% → 20.3%，模拟上游采集字段大面积丢失。","method":"缺失率","intensity":1.15,"metrics":{"accuracy":0.8,"precision":0.6942,"recall":0.5363,"f1":0.6051,"auc":0.8573,"tp":613,"fp":270,"tn":2587,"fn":530,"pred_pos_rate":0.2208,"actual_pos_rate":0.2858},"confusion":{"tp":613,"fp":270,"tn":2587,"fn":530},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0007,"ks":0.0058,"miss_ref":0.0592,"miss_cur":0.271},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0042,"tpr":0.1347},{"fpr":0.0133,"tpr":0.2572},{"fpr":0.0319,"tpr":0.3561},{"fpr":0.0536,"tpr":0.4471},{"fpr":0.084,"tpr":0.5162},{"fpr":0.1155,"tpr":0.5827},{"fpr":0.1484,"tpr":0.6457},{"fpr":0.1789,"tpr":0.7148},{"fpr":0.2188,"tpr":0.7603},{"fpr":0.259,"tpr":0.8049},{"fpr":0.3049,"tpr":0.8355},{"fpr":0.3483,"tpr":0.8723},{"fpr":0.3959,"tpr":0.8985},{"fpr":0.4431,"tpr":0.9256},{"fpr":0.4949,"tpr":0.9414},{"fpr":0.5446,"tpr":0.9624},{"fpr":0.5999,"tpr":0.9694},{"fpr":0.6545,"tpr":0.9781},{"fpr":0.7091,"tpr":0.9869},{"fpr":0.7641,"tpr":0.9948},{"fpr":0.8208,"tpr":0.9983},{"fpr":0.8782,"tpr":1.0},{"fpr":0.9363,"tpr":1.0},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"missing","field":"support_tickets"}},{"id":"extreme","name":"极端值注入 3%","kind":"extreme","field":"income","desc":"向 3% 样本注入 3~5 倍极端 income，检验指标是否被异常值带偏。","method":"PSI","intensity":1.0,"metrics":{"accuracy":0.8137,"precision":0.7196,"recall":0.5704,"f1":0.6364,"auc":0.8591,"tp":652,"fp":254,"tn":2603,"fn":491,"pred_pos_rate":0.2265,"actual_pos_rate":0.2858},"confusion":{"tp":652,"fp":254,"tn":2603,"fn":491},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0897,"ks":0.0269,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0025,"tpr":0.1391},{"fpr":0.0105,"tpr":0.2642},{"fpr":0.0277,"tpr":0.3666},{"fpr":0.0466,"tpr":0.4646},{"fpr":0.0753,"tpr":0.5381},{"fpr":0.1064,"tpr":0.6054},{"fpr":0.1411,"tpr":0.664},{"fpr":0.1715,"tpr":0.7332},{"fpr":0.2149,"tpr":0.7699},{"fpr":0.2545,"tpr":0.8163},{"fpr":0.3,"tpr":0.8478},{"fpr":0.3455,"tpr":0.8793},{"fpr":0.3973,"tpr":0.895},{"fpr":0.4477,"tpr":0.9143},{"fpr":0.4984,"tpr":0.9326},{"fpr":0.5485,"tpr":0.9528},{"fpr":0.6045,"tpr":0.958},{"fpr":0.6591,"tpr":0.9668},{"fpr":0.7144,"tpr":0.9738},{"fpr":0.77,"tpr":0.9799},{"fpr":0.8274,"tpr":0.9816},{"fpr":0.8845,"tpr":0.9843},{"fpr":0.9398,"tpr":0.9913},{"fpr":0.9947,"tpr":0.9991},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"psi","field":"income"}},{"id":"device_shift","name":"device 结构变化","kind":"device_shift","field":"device","desc":"device=iOS 占比 40% → 10%，Android 45% → 75%。漂移显著但模型对该字段不敏感。","method":"卡方检验","intensity":1.0,"metrics":{"accuracy":0.8173,"precision":0.7146,"recall":0.6002,"f1":0.6524,"auc":0.8753,"tp":686,"fp":274,"tn":2583,"fn":457,"pred_pos_rate":0.24,"actual_pos_rate":0.2858},"confusion":{"tp":686,"fp":274,"tn":2583,"fn":457},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.5383,"chi2":968.226,"pvalue":2.827518414153519e-211,"levels":[{"level":"iOS","ref":0.3827,"cur":0.0975},{"level":"Android","ref":0.4572,"cur":0.753},{"level":"Web","ref":0.16,"cur":0.1495}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0028,"tpr":0.1382},{"fpr":0.0112,"tpr":0.2625},{"fpr":0.0273,"tpr":0.3675},{"fpr":0.0448,"tpr":0.4689},{"fpr":0.0735,"tpr":0.5424},{"fpr":0.1033,"tpr":0.6133},{"fpr":0.1369,"tpr":0.6745},{"fpr":0.1677,"tpr":0.7428},{"fpr":0.2083,"tpr":0.7865},{"fpr":0.2492,"tpr":0.8294},{"fpr":0.2933,"tpr":0.8644},{"fpr":0.3392,"tpr":0.895},{"fpr":0.3871,"tpr":0.9204},{"fpr":0.4389,"tpr":0.9361},{"fpr":0.4914,"tpr":0.9501},{"fpr":0.5415,"tpr":0.9703},{"fpr":0.5971,"tpr":0.9764},{"fpr":0.6528,"tpr":0.9825},{"fpr":0.7081,"tpr":0.9895},{"fpr":0.763,"tpr":0.9974},{"fpr":0.8211,"tpr":0.9974},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"chi_square","field":"device"}},{"id":"tenure_shift","name":"tenure 均值 +15%","kind":"tenure_shift","field":"tenure_months","desc":"tenure_months 均值 +15%，老用户比例上升，属于模型强敏感字段。","method":"PSI","intensity":1.0,"metrics":{"accuracy":0.8175,"precision":0.7565,"recall":0.5328,"f1":0.6253,"auc":0.875,"tp":609,"fp":196,"tn":2661,"fn":534,"pred_pos_rate":0.2013,"actual_pos_rate":0.2858},"confusion":{"tp":609,"fp":196,"tn":2661,"fn":534},"fields":[{"field":"age","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"income","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0057,"miss_cur":0.0057},{"field":"tenure_months","type":"numeric","psi":0.1065,"ks":0.1168,"miss_ref":0.0,"miss_cur":0.0},{"field":"support_tickets","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0592,"miss_cur":0.0592},{"field":"last_login_days","type":"numeric","psi":0.0,"ks":0.0003,"miss_ref":0.0,"miss_cur":0.0},{"field":"city","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"北京","ref":0.2485,"cur":0.2485},{"level":"上海","ref":0.2218,"cur":0.2218},{"level":"深圳","ref":0.1648,"cur":0.1648},{"level":"广州","ref":0.149,"cur":0.149},{"level":"成都","ref":0.1185,"cur":0.1185},{"level":"其他","ref":0.078,"cur":0.078}]},{"field":"plan","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"基础","ref":0.4517,"cur":0.4517},{"level":"标准","ref":0.3503,"cur":0.3503},{"level":"尊享","ref":0.198,"cur":0.198}]},{"field":"device","type":"categorical","psi":0.0,"chi2":0.0,"pvalue":1.0,"levels":[{"level":"iOS","ref":0.3827,"cur":0.3827},{"level":"Android","ref":0.4572,"cur":0.4572},{"level":"Web","ref":0.16,"cur":0.16}]}],"roc":[{"fpr":0.0,"tpr":0.0},{"fpr":0.0025,"tpr":0.1391},{"fpr":0.0112,"tpr":0.2625},{"fpr":0.0273,"tpr":0.3675},{"fpr":0.0455,"tpr":0.4672},{"fpr":0.0739,"tpr":0.5416},{"fpr":0.1036,"tpr":0.6124},{"fpr":0.1362,"tpr":0.6763},{"fpr":0.1694,"tpr":0.7384},{"fpr":0.2093,"tpr":0.7839},{"fpr":0.2496,"tpr":0.8285},{"fpr":0.2944,"tpr":0.8618},{"fpr":0.3399,"tpr":0.8933},{"fpr":0.3878,"tpr":0.9186},{"fpr":0.4382,"tpr":0.9379},{"fpr":0.4907,"tpr":0.9519},{"fpr":0.5422,"tpr":0.9685},{"fpr":0.5968,"tpr":0.9773},{"fpr":0.6528,"tpr":0.9825},{"fpr":0.7077,"tpr":0.9904},{"fpr":0.7644,"tpr":0.9939},{"fpr":0.8208,"tpr":0.9983},{"fpr":0.8785,"tpr":0.9991},{"fpr":0.9366,"tpr":0.9991},{"fpr":0.9944,"tpr":1.0},{"fpr":1.0,"tpr":1.0},{"fpr":1.0,"tpr":1.0}],"detector":{"method":"psi","field":"tenure_months"}}],"calibration":{"rows":[{"threshold":0.02,"tp":3,"fp":2,"fn":0,"tn":1,"false_alarm_rate":0.6667,"miss_rate":0.0,"recall":1.0,"precision":0.6,"f1":0.75},{"threshold":0.05,"tp":3,"fp":2,"fn":0,"tn":1,"false_alarm_rate":0.6667,"miss_rate":0.0,"recall":1.0,"precision":0.6,"f1":0.75},{"threshold":0.08,"tp":3,"fp":1,"fn":0,"tn":2,"false_alarm_rate":0.3333,"miss_rate":0.0,"recall":1.0,"precision":0.75,"f1":0.8571},{"threshold":0.1,"tp":3,"fp":0,"fn":0,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.12,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.15,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.18,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.2,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.25,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.3,"tp":1,"fp":0,"fn":2,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.6667,"recall":0.3333,"precision":1.0,"f1":0.5},{"threshold":0.4,"tp":1,"fp":0,"fn":2,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.6667,"recall":0.3333,"precision":1.0,"f1":0.5}],"best":{"threshold":0.1,"tp":3,"fp":0,"fn":0,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},"impact_set":[{"id":"control","name":"对照组（无变化）","method":"psi","field":"income","f1":0.6496876501681884,"f1_delta":0.0,"impacted":false,"psi":0.0,"score":0.0},{"id":"income_mild","name":"income 均值 +10%","method":"psi","field":"income","f1":0.635,"f1_delta":-0.0147,"impacted":false,"psi":0.074,"score":0.074},{"id":"income_shift","name":"income 均值 +20%","method":"psi","field":"income","f1":0.6237776634071024,"f1_delta":-0.0259,"impacted":true,"psi":0.2628,"score":0.2628},{"id":"income_hard","name":"income 均值 +30%","method":"psi","field":"income","f1":0.6089266737513284,"f1_delta":-0.0408,"impacted":true,"psi":0.5376,"score":0.5376},{"id":"age_variance","name":"age 方差扩大 1.5x","method":"ks","field":"age","f1":0.6468330134357007,"f1_delta":-0.0029,"impacted":false,"ks":0.1052,"pvalue":5.0353173882479115e-39,"score":5.0353173882479115e-39},{"id":"city_shift","name":"city 比例重分配","method":"chi_square","field":"city","f1":0.6312625250501002,"f1_delta":-0.0184,"impacted":false,"chi2":1005.423,"pvalue":2.0100705365492448e-215,"score":2.0100705365492448e-215},{"id":"plan_shift","name":"plan 结构变化","method":"chi_square","field":"plan","f1":0.6126760563380282,"f1_delta":-0.037,"impacted":true,"chi2":517.263,"pvalue":2.3809666031681568e-113,"score":2.3809666031681568e-113},{"id":"missing_up","name":"缺失率提升至 20%","method":"missing","field":"support_tickets","f1":0.6051332675222113,"f1_delta":-0.0446,"impacted":true,"miss_ref":0.0592,"miss_cur":0.271,"miss_delta":0.2118,"score":0.2118},{"id":"extreme","name":"极端值注入 3%","method":"psi","field":"income","f1":0.6364080039043435,"f1_delta":-0.0133,"impacted":false,"psi":0.0897,"score":0.0897},{"id":"device_shift","name":"device 结构变化","method":"chi_square","field":"device","f1":0.6524013314312885,"f1_delta":0.0027,"impacted":false,"chi2":968.226,"pvalue":2.827518414153519e-211,"score":2.827518414153519e-211},{"id":"tenure_shift","name":"tenure 均值 +15%","method":"psi","field":"tenure_months","f1":0.6252566735112935,"f1_delta":-0.0244,"impacted":true,"psi":0.1065,"score":0.1065}],"impact_delta":0.02,"psi":{"rows":[{"threshold":0.02,"tp":3,"fp":2,"fn":0,"tn":1,"false_alarm_rate":0.6667,"miss_rate":0.0,"recall":1.0,"precision":0.6,"f1":0.75},{"threshold":0.05,"tp":3,"fp":2,"fn":0,"tn":1,"false_alarm_rate":0.6667,"miss_rate":0.0,"recall":1.0,"precision":0.6,"f1":0.75},{"threshold":0.08,"tp":3,"fp":1,"fn":0,"tn":2,"false_alarm_rate":0.3333,"miss_rate":0.0,"recall":1.0,"precision":0.75,"f1":0.8571},{"threshold":0.1,"tp":3,"fp":0,"fn":0,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.12,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.15,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.18,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.2,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.25,"tp":2,"fp":0,"fn":1,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.3333,"recall":0.6667,"precision":1.0,"f1":0.8},{"threshold":0.3,"tp":1,"fp":0,"fn":2,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.6667,"recall":0.3333,"precision":1.0,"f1":0.5},{"threshold":0.4,"tp":1,"fp":0,"fn":2,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.6667,"recall":0.3333,"precision":1.0,"f1":0.5}],"best":{"threshold":0.1,"tp":3,"fp":0,"fn":0,"tn":3,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0}},"test":{"rows":[{"threshold":0.2,"tp":1,"fp":3,"fn":0,"tn":0,"false_alarm_rate":1.0,"miss_rate":0.0,"recall":1.0,"precision":0.25,"f1":0.4},{"threshold":0.1,"tp":1,"fp":3,"fn":0,"tn":0,"false_alarm_rate":1.0,"miss_rate":0.0,"recall":1.0,"precision":0.25,"f1":0.4},{"threshold":0.05,"tp":1,"fp":3,"fn":0,"tn":0,"false_alarm_rate":1.0,"miss_rate":0.0,"recall":1.0,"precision":0.25,"f1":0.4},{"threshold":0.01,"tp":1,"fp":3,"fn":0,"tn":0,"false_alarm_rate":1.0,"miss_rate":0.0,"recall":1.0,"precision":0.25,"f1":0.4},{"threshold":0.005,"tp":1,"fp":3,"fn":0,"tn":0,"false_alarm_rate":1.0,"miss_rate":0.0,"recall":1.0,"precision":0.25,"f1":0.4}],"best":{"threshold":0.2,"tp":1,"fp":3,"fn":0,"tn":0,"false_alarm_rate":1.0,"miss_rate":0.0,"recall":1.0,"precision":0.25,"f1":0.4}},"missing":{"rows":[{"threshold":0.02,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.05,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.08,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.1,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.12,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.15,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0},{"threshold":0.2,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0}],"best":{"threshold":0.2,"tp":1,"fp":0,"fn":0,"tn":0,"false_alarm_rate":0.0,"miss_rate":0.0,"recall":1.0,"precision":1.0,"f1":1.0}}},"config":{"model_name":"demo_churn_classifier","model_version":"v1.0.0","task_type":"binary_classification","generated_by":"DriftSentinel v1.0","features":{"income":{"method":"psi","warning_threshold":0.1,"critical_threshold":0.2,"dtype":"numeric"},"age":{"method":"ks","warning_pvalue":0.05,"dtype":"numeric"},"city":{"method":"chi_square","warning_pvalue":0.05,"dtype":"categorical"},"plan":{"method":"psi","warning_threshold":0.1,"dtype":"categorical"},"support_tickets":{"method":"missing_rate","warning_threshold":0.1,"dtype":"numeric"}},"global_rules":{"missing_rate_alert":0.1,"prediction_rate_change":0.15,"f1_drop_alert":0.02},"monitor_window":"1h","min_samples":500,"notes":"阈值基于当前基准数据与压力场景推荐，不保证对所有数据集通用。"},"histograms":{"income_mild":{"field":"income","edges":[-4287.09,-1642.51,1002.07,3646.65,6291.23,8935.81,11580.39,14224.97,16869.55,19514.13,22158.71],"ref":[9,58,285,901,1272,977,388,78,8,1],"cur":[10,52,222,710,1162,1053,552,176,37,3],"ref_mean":7839.86,"cur_mean":8623.85},"income_shift":{"field":"income","edges":[-4676.82,-1791.83,1093.17,3978.16,6863.16,9748.15,12633.15,15518.15,18403.14,21288.14,24173.13],"ref":[8,63,368,1069,1404,803,230,30,2,0],"cur":[10,52,222,710,1162,1053,552,176,37,3],"ref_mean":7839.86,"cur_mean":9407.84},"income_hard":{"field":"income","edges":[-5066.56,-1941.15,1184.26,4309.68,7435.09,10560.5,13685.91,16811.33,19936.74,23062.15,26187.56],"ref":[8,66,444,1285,1414,635,115,9,1,0],"cur":[10,52,222,710,1162,1053,552,176,37,3],"ref_mean":7839.86,"cur_mean":10191.82},"age_variance":{"field":"age","edges":[-26.4,-12.41,1.58,15.57,29.56,43.55,57.54,71.53,85.52,99.51,113.5],"ref":[0,6,82,602,1646,1264,353,46,1,0],"cur":[11,62,264,731,1179,963,563,174,47,6],"ref_mean":41.21,"cur_mean":41.16},"missing_up":{"field":"support_tickets","edges":[-4.38,-2.87,-1.37,0.14,1.65,3.16,4.67,6.18,7.69,9.2,10.7],"ref":[6,30,175,570,938,1039,650,271,75,9],"cur":[3,24,127,447,734,788,512,213,61,7],"ref_mean":3.39,"cur_mean":3.41},"extreme":{"field":"income","edges":[-3897.35,4062.28,12021.92,19981.56,27941.19,35900.83,43860.47,51820.11,59779.74,67739.38,75699.02],"ref":[459,3126,391,1,0,0,0,0,0,0],"cur":[446,3042,402,23,19,25,12,5,1,2],"ref_mean":7839.86,"cur_mean":8535.28},"tenure_shift":{"field":"tenure_months","edges":[-40.84,-27.22,-13.59,0.03,13.65,27.28,40.9,54.53,68.15,81.77,95.4],"ref":[1,5,106,589,1396,1260,543,88,11,1],"cur":[2,15,95,474,1108,1252,756,262,28,8],"ref_mean":26.68,"cur_mean":30.69},"last_login_days":{"field":"last_login_days","edges":[-20.52,-13.3,-6.07,1.16,8.39,15.62,22.84,30.07,37.3,44.53,51.76],"ref":[13,105,425,925,1168,925,329,95,13,2],"cur":[13,105,425,925,1168,925,329,95,13,2],"ref_mean":11.59,"cur_mean":11.59}}};
+</script>
+<script>
+/* DriftSentinel V2 — 向导式流程 */
+
+const D = DATA;
+const $ = s => document.querySelector(s);
+const fmt = (v, n = 4) => (v === null || v === undefined || isNaN(v)) ? '—' : Number(v).toFixed(n);
+const pct = (v, n = 1) => (v === null || v === undefined || isNaN(v)) ? '—' : (v * 100).toFixed(n) + '%';
+const sig = v => v == null ? '—' : (v < 1e-4 ? '<1e-4' : v.toExponential(2));
+
+const STEPS = [
+  { id: 'setup',       lbl: '实验设置', title: '准备基准数据与模型',
+    sub: 'DriftSentinel 从一份基准数据出发，自动生成可控的数据变化场景，调用你的模型预测，并把数据变化与模型行为变化关联起来。这一步先确定实验的输入。' },
+  { id: 'profile',     lbl: '数据画像', title: '基准数据画像',
+    sub: '平台自动识别字段类型并统计质量特征。这些画像将作为后续所有漂移场景的对比基线。' },
+  { id: 'scenarios',   lbl: '场景配置', title: '选择压力测试场景',
+    sub: '每个场景都基于基准数据做可控变换，参数可解释、结果可复现。勾选要运行的场景，或调整强度。' },
+  { id: 'detection',   lbl: '漂移检测', title: '字段级漂移检测结果',
+    sub: '比较基准数据与场景数据的分布差异。注意：这一步只能说明输入变了，还不能说明模型性能下降。' },
+  { id: 'impact',      lbl: '模型影响', title: '模型受到的真实影响',
+    sub: '用同一份模型分别预测基准数据与场景数据，对比输出分布与性能指标，判断漂移是否真的伤害了模型。' },
+  { id: 'calibration', lbl: '阈值校准', title: '告警阈值校准',
+    sub: '把场景的真实影响当作答案，检验不同阈值能否正确区分。这一步决定线上监控的告警灵敏度。' },
+  { id: 'report',      lbl: '报告导出', title: '实验报告与监控配置',
+    sub: '汇总结论并导出可接入线上监控的配置文件。配置中同时记录了本次实验的全部场景，便于追溯阈值来源。' },
+];
+
+let CURRENT = 'setup';
+let SELECTED_SCENARIO = 'income_shift';
+let CALIB_FAMILY = 'psi';
+let SELECTED_SCENARIOS = new Set(D.scenarios.filter(s => s.kind !== 'control').map(s => s.id));
+
+function go(id) {
+  CURRENT = id;
+  renderSteps();
+  const s = STEPS.find(x => x.id === id);
+  $('#content').innerHTML = `
+    <div class="page-head"><h2>${s.title}</h2><p>${s.sub}</p></div>
+    ${VIEWS[id]()}`;
+  const i = STEPS.findIndex(x => x.id === id);
+  $('#btnPrev').disabled = i === 0;
+  $('#btnNext').disabled = i === STEPS.length - 1;
+  $('#btnNext').textContent = i === STEPS.length - 1 ? '已完成' : `下一步：${STEPS[i + 1].lbl}`;
+  $('#footHint').textContent = `第 ${i + 1} 步 / 共 ${STEPS.length} 步 · ${s.lbl}`;
+  if (typeof BIND[id] === 'function') BIND[id]();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function next() { const i = STEPS.findIndex(x => x.id === CURRENT); if (i < STEPS.length - 1) go(STEPS[i + 1].id); }
+function prev() { const i = STEPS.findIndex(x => x.id === CURRENT); if (i > 0) go(STEPS[i - 1].id); }
+
+function renderSteps() {
+  const cur = STEPS.findIndex(x => x.id === CURRENT);
+  $('#steps').innerHTML = STEPS.map((s, i) => `
+    <div class="step-item ${i < cur ? 'done' : ''} ${i === cur ? 'current' : ''}" data-step="${s.id}">
+      <div class="bar"></div>
+      <div class="dot">${i < cur ? '✓' : i + 1}</div>
+      <div class="lbl">${s.lbl}</div>
+    </div>`).join('');
+  $('#progressNote').textContent = `实验：demo_churn_classifier v1.0.0 · ${D.meta.n_rows.toLocaleString()} 行基准数据 · 随机种子 42 · 所有数据仅在本机处理`;
+  document.querySelectorAll('[data-step]').forEach(el => el.onclick = () => go(el.dataset.step));
+}
+
+/* ---------- 通用片段 ---------- */
+const card = (title, desc, body) => `
+  <section class="card">
+    <div class="card-head"><div><h3>${title}</h3>${desc ? `<p>${desc}</p>` : ''}</div></div>
+    ${body}
+  </section>`;
+
+const statCard = (lbl, val, hint = '') => `
+  <div class="stat"><div class="lbl">${lbl}</div><div class="val">${val}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+
+function riskTag(psi, warn = 0.10, crit = 0.20) {
+  if (psi >= crit) return '<span class="tag t-crit">严重</span>';
+  if (psi >= warn) return '<span class="tag t-warn">预警</span>';
+  return '<span class="tag t-ok">正常</span>';
+}
+function deltaCell(base, cur, digits = 4) {
+  const d = cur - base;
+  if (Math.abs(d) < 1e-9) return '<span class="flat">±0.0000</span>';
+  return `<span class="${d < 0 ? 'bad' : 'good'}">${d > 0 ? '+' : ''}${d.toFixed(digits)}</span>`;
+}
+function deltaNeutral(base, cur, digits = 4) {
+  const d = cur - base;
+  if (Math.abs(d) < 1e-9) return '<span class="flat">±0.0000</span>';
+  return `<span class="${Math.abs(d) > 0.01 ? 'shift' : 'flat'}">${d > 0 ? '+' : ''}${d.toFixed(digits)}</span>`;
+}
+
+/* ---------- SVG 图表 ---------- */
+const C = { indigo: '#5850ec', orange: '#d9711e', green: '#1a7f4b', amber: '#d9a441',
+            red: '#c9352b', grid: '#e2e6ec', text: '#5a6572', dim: '#8a95a3' };
+
+const svgOpen = (w, h) => `<svg class="chart" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img">`;
+const legend = items => `<div class="legend">${items.map(i =>
+  `<span><i style="background:${i.c}"></i>${i.t}</span>`).join('')}</div>`;
+
+function histChart(hist, w = 640, h = 250) {
+  const pad = { l: 48, r: 16, t: 16, b: 40 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const maxV = Math.max(...hist.ref, ...hist.cur);
+  const n = hist.edges.length - 1;
+  const bw = iw / n;
+  let s = svgOpen(w, h);
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + ih - (ih * g / 4);
+    s += `<line x1="${pad.l}" y1="${y}" x2="${pad.l + iw}" y2="${y}" stroke="${C.grid}" stroke-width="1"/>`;
+    s += `<text x="${pad.l - 9}" y="${y + 4}" text-anchor="end" font-size="11" fill="${C.dim}" font-family="monospace">${Math.round(maxV * g / 4)}</text>`;
+  }
+  for (let i = 0; i < n; i++) {
+    const hR = ih * hist.ref[i] / maxV, hC = ih * hist.cur[i] / maxV;
+    const x = pad.l + i * bw;
+    s += `<rect x="${x + 1.5}" y="${pad.t + ih - hR}" width="${bw - 3}" height="${hR}" fill="${C.indigo}" opacity="0.3"/>`;
+    s += `<rect x="${x + 1.5}" y="${pad.t + ih - hC}" width="${bw - 3}" height="${hC}" fill="${C.orange}" opacity="0.45" stroke="${C.orange}" stroke-width="0.75"/>`;
+  }
+  s += `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${pad.l + iw}" y2="${pad.t + ih}" stroke="${C.border || C.grid}" stroke-width="1.5"/>`;
+  for (let i = 0; i <= n; i += 2) {
+    const x = pad.l + i * bw;
+    s += `<text x="${Math.min(x, pad.l + iw)}" y="${h - 18}" text-anchor="middle" font-size="11" fill="${C.dim}" font-family="monospace">${hist.edges[i].toLocaleString()}</text>`;
+  }
+  s += `<text x="${pad.l + iw / 2}" y="${h - 2}" text-anchor="middle" font-size="11.5" fill="${C.dim}">${hist.field || ''}</text>`;
+  return s + '</svg>';
+}
+
+function catChart(levels, w = 640) {
+  const rowH = 32;
+  const h = levels.length * rowH + 14;
+  const pad = { l: 66, r: 104, t: 6 };
+  const iw = w - pad.l - pad.r;
+  const maxV = Math.max(...levels.flatMap(l => [l.ref, l.cur])) || 1;
+  let s = svgOpen(w, h);
+  levels.forEach((l, i) => {
+    const y = pad.t + i * rowH;
+    s += `<text x="${pad.l - 11}" y="${y + 17}" text-anchor="end" font-size="12" fill="${C.text}">${l.level}</text>`;
+    s += `<rect x="${pad.l}" y="${y + 2}" width="${iw * l.ref / maxV}" height="9" rx="3" fill="${C.indigo}" opacity="0.65"/>`;
+    s += `<rect x="${pad.l}" y="${y + 15}" width="${iw * l.cur / maxV}" height="9" rx="3" fill="${C.orange}" opacity="0.8"/>`;
+    s += `<text x="${pad.l + iw + 9}" y="${y + 11}" font-size="11" fill="${C.indigo}" font-family="monospace">${(l.ref * 100).toFixed(1)}%</text>`;
+    s += `<text x="${pad.l + iw + 9}" y="${y + 24}" font-size="11" fill="${C.orange}" font-family="monospace">${(l.cur * 100).toFixed(1)}%</text>`;
+  });
+  return s + '</svg>';
+}
+
+function metricBars(rows, w = 640, h = 230) {
+  const pad = { l: 108, r: 66, t: 12, b: 12 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const rowH = ih / rows.length;
+  let s = svgOpen(w, h);
+  rows.forEach((r, i) => {
+    const y = pad.t + i * rowH;
+    s += `<text x="${pad.l - 11}" y="${y + rowH / 2 + 4}" text-anchor="end" font-size="12" fill="${C.text}">${r.label}</text>`;
+    s += `<rect x="${pad.l}" y="${y + rowH * 0.13}" width="${iw * r.base}" height="11" rx="3" fill="${C.indigo}" opacity="0.65"/>`;
+    s += `<rect x="${pad.l}" y="${y + rowH * 0.53}" width="${iw * r.cur}" height="11" rx="3" fill="${C.orange}" opacity="0.8"/>`;
+    s += `<text x="${pad.l + iw + 9}" y="${y + rowH * 0.3}" font-size="11" fill="${C.indigo}" font-family="monospace">${r.base.toFixed(3)}</text>`;
+    s += `<text x="${pad.l + iw + 9}" y="${y + rowH * 0.72}" font-size="11" fill="${C.orange}" font-family="monospace">${r.cur.toFixed(3)}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function rocChart(rocA, rocB, w = 360, h = 300) {
+  const pad = { l: 46, r: 14, t: 14, b: 38 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  let s = svgOpen(w, h);
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + ih - ih * g / 4;
+    const x = pad.l + iw * g / 4;
+    s += `<line x1="${pad.l}" y1="${y}" x2="${pad.l + iw}" y2="${y}" stroke="${C.grid}" stroke-width="1"/>`;
+    s += `<text x="${pad.l - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="${C.dim}" font-family="monospace">${g / 4}</text>`;
+    s += `<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + ih}" stroke="${C.grid}" stroke-width="1"/>`;
+    s += `<text x="${x}" y="${h - 18}" text-anchor="middle" font-size="11" fill="${C.dim}" font-family="monospace">${g / 4}</text>`;
+  }
+  s += `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${pad.l + iw}" y2="${pad.t}" stroke="${C.grid}" stroke-width="1.2" stroke-dasharray="4 4"/>`;
+  const path = roc => 'M' + roc.map(p => `${pad.l + p.fpr * iw},${pad.t + ih - p.tpr * ih}`).join(' L');
+  s += `<path d="${path(rocB)}" fill="none" stroke="${C.orange}" stroke-width="2"/>`;
+  s += `<path d="${path(rocA)}" fill="none" stroke="${C.indigo}" stroke-width="2"/>`;
+  s += `<text x="${pad.l + iw / 2}" y="${h - 2}" text-anchor="middle" font-size="11.5" fill="${C.dim}">False positive rate</text>`;
+  return s + '</svg>';
+}
+
+function sweepChart(rows, w = 640, h = 260) {
+  const pad = { l: 48, r: 16, t: 16, b: 42 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const xs = rows.map(r => r.threshold);
+  const xmin = Math.min(...xs), xmax = Math.max(...xs);
+  const series = [
+    { key: 'false_alarm_rate', c: C.red },
+    { key: 'miss_rate', c: C.amber },
+    { key: 'recall', c: C.green },
+    { key: 'precision', c: C.indigo },
+  ];
+  let s = svgOpen(w, h);
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + ih - ih * g / 4;
+    s += `<line x1="${pad.l}" y1="${y}" x2="${pad.l + iw}" y2="${y}" stroke="${C.grid}" stroke-width="1"/>`;
+    s += `<text x="${pad.l - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="${C.dim}" font-family="monospace">${g * 25}%</text>`;
+  }
+  const X = v => pad.l + (v - xmin) / (xmax - xmin || 1) * iw;
+  const Y = v => pad.t + ih - v * ih;
+  series.forEach(se => {
+    const pts = rows.map(r => `${X(r.threshold)},${Y(r[se.key])}`).join(' L');
+    s += `<path d="M${pts}" fill="none" stroke="${se.c}" stroke-width="2"/>`;
+    rows.forEach(r => { s += `<circle cx="${X(r.threshold)}" cy="${Y(r[se.key])}" r="3" fill="${se.c}"/>`; });
+  });
+  xs.forEach(v => { s += `<text x="${X(v)}" y="${h - 20}" text-anchor="middle" font-size="11" fill="${C.dim}" font-family="monospace">${v}</text>`; });
+  s += `<text x="${pad.l + iw / 2}" y="${h - 2}" text-anchor="middle" font-size="11.5" fill="${C.dim}">阈值</text>`;
+  return s + '</svg>';
+}
+
+/* ---------- 视图 ---------- */
+const VIEWS = {};
+const BIND = {};
+
+/* 1. 实验设置 */
+VIEWS.setup = () => {
+  const b = D.baseline.metrics;
+  return `
+  <div class="grid g2">
+    ${card('① 选择基准数据', '基准数据代表模型训练或上线初期的稳定状态，后续所有场景都由它变换而来。',
+      `<div class="upload-zone">
+        <div class="icon">📄</div>
+        <h4>churn_reference.csv</h4>
+        <p>${D.meta.n_rows.toLocaleString()} 行 · ${D.profile.length} 字段 · 已加载</p>
+      </div>
+      <div style="margin-top:18px">
+        <div class="field">
+          <label>标签列（用于计算真实性能）</label>
+          <select><option selected>${D.label} — 二分类，正类占比 ${pct(b.actual_pos_rate)}</option><option>无标签（仅观察数据与预测变化）</option></select>
+          <div class="help">有标签才能计算 F1 / Recall / AUC；没有标签时平台只报告数据分布与预测变化，不会给出性能结论。</div>
+        </div>
+        <div class="field">
+          <label>数据说明</label>
+          <div class="help">公开示例数据集（合成生成，不含真实个人信息）。你也可以上传自己的 CSV，字段类型会自动识别。</div>
+        </div>
+      </div>`)}
+
+    ${card('② 选择模型', '模型只需提供统一的 predict 接口，具体算法不受限制。',
+      `<div class="kv"><span class="k">模型名称</span><span class="v">${D.model.name}</span></div>
+      <div class="kv"><span class="k">算法</span><span class="v">${D.model.algorithm}</span></div>
+      <div class="kv"><span class="k">版本</span><span class="v">${D.model.version}</span></div>
+      <div class="kv"><span class="k">特征维度</span><span class="v">${D.model.features}</span></div>
+      <div class="kv"><span class="k">训练样本</span><span class="v">${D.model.train_samples.toLocaleString()}</span></div>
+      <div class="kv"><span class="k">判定阈值</span><span class="v">${D.model.threshold}</span></div>
+      <div class="kv"><span class="k">随机种子</span><span class="v">${D.model.seed}</span></div>
+      <div class="kv"><span class="k">适配器</span><span class="v">${D.model.adapter}</span></div>
+      <hr class="sep">
+      <div class="notice info">
+        <strong>本地优先：</strong>pickle / joblib 可能执行任意代码，因此模型只在本机加载，不在公网反序列化陌生文件。后续版本将支持隔离进程或 ONNX。
+      </div>`)}
+  </div>
+
+  ${card('实验参数', '固定随机种子以保证任何一次实验都可被完整重现。',
+    `<div class="grid g4">
+      <div class="field" style="margin:0">
+        <label>全局随机种子</label>
+        <input type="text" value="42" class="mono">
+        <div class="help">控制场景生成与模型训练</div>
+      </div>
+      <div class="field" style="margin:0">
+        <label>PSI 分箱数</label>
+        <input type="text" value="10" class="mono">
+        <div class="help">影响 PSI 的敏感度</div>
+      </div>
+      <div class="field" style="margin:0">
+        <label>影响判定阈值 ΔF1</label>
+        <input type="text" value="${D.calibration.impact_delta}" class="mono">
+        <div class="help">F1 下降超过此值视为性能下降</div>
+      </div>
+      <div class="field" style="margin:0">
+        <label>监控窗口</label>
+        <input type="text" value="${D.config.monitor_window}" class="mono">
+        <div class="help">导出配置中的监控窗口</div>
+      </div>
+    </div>`)}
+
+  ${card('实验将回答的问题', '这也是 DriftSentinel 与普通数据对比工具的根本区别。',
+    `<div class="grid g3">
+      ${statCard('数据变化', '输入分布是否偏离了基准？', 'PSI / KS / 卡方 / 缺失率')}
+      ${statCard('输出变化', '模型的预测行为是否改变？', '预测占比 / 概率分布')}
+      ${statCard('性能变化', '有标签时，模型是否真的变差？', 'F1 / Recall / AUC / 混淆矩阵')}
+    </div>`)}`;
+};
+
+/* 2. 数据画像 */
+VIEWS.profile = () => {
+  const catF = D.profile.filter(p => p.dtype === 'categorical');
+  const totalMiss = D.profile.reduce((s, p) => s + p.missing, 0) / D.profile.length;
+  return `
+  <div class="grid g4" style="margin-bottom:20px">
+    ${statCard('总行数', D.meta.n_rows.toLocaleString())}
+    ${statCard('字段数', D.profile.length)}
+    ${statCard('平均缺失率', pct(totalMiss, 2))}
+    ${statCard('重复行占比', pct(D.duplicate_ratio, 2))}
+  </div>
+
+  ${card('字段画像', '每个字段的类型、缺失率、唯一值数量与分布统计，监控方法按字段类型自动匹配。',
+    `<div class="tbl-wrap"><table>
+      <thead><tr><th>字段</th><th>类型</th><th class="num-cell">缺失率</th><th class="num-cell">唯一值</th>
+      <th class="num-cell">均值</th><th class="num-cell">标准差</th><th class="num-cell">P25</th><th class="num-cell">中位数</th><th class="num-cell">P75</th><th>建议监控</th></tr></thead>
+      <tbody>${D.profile.map(p => `
+        <tr>
+          <td class="mono">${p.field}</td>
+          <td><span class="tag ${p.dtype === 'numeric' ? 't-info' : 't-orange'}">${p.dtype_label}</span></td>
+          <td class="num-cell">${p.missing > 0 ? pct(p.missing, 2) : '0.00%'}</td>
+          <td class="num-cell">${p.unique.toLocaleString()}</td>
+          ${p.dtype === 'numeric' ? `
+            <td class="num-cell">${p.mean.toLocaleString()}</td>
+            <td class="num-cell">${p.std.toLocaleString()}</td>
+            <td class="num-cell">${p.q25.toLocaleString()}</td>
+            <td class="num-cell">${p.q50.toLocaleString()}</td>
+            <td class="num-cell">${p.q75.toLocaleString()}</td>` : `
+            <td class="num-cell muted" colspan="5">${p.levels.length} 个类别</td>`}
+          <td><span class="tag t-neutral">${p.monitor}</span></td>
+        </tr>`).join('')}</tbody>
+    </table></div>`)}
+
+  <div class="grid g3">
+    ${catF.map(p => card(`${p.field} 类别分布`, '基准数据中的类别占比，作为后续类别漂移的对比基线。',
+      `<div class="tbl-wrap"><table>
+        <thead><tr><th>类别</th><th class="num-cell">占比</th><th class="num-cell">计数</th></tr></thead>
+        <tbody>${p.levels.map(l => `
+          <tr><td>${l.level}</td><td class="num-cell">${pct(l.ratio, 1)}</td><td class="num-cell">${l.count.toLocaleString()}</td></tr>`).join('')}
+        </tbody></table></div>`)).join('')}
+  </div>
+
+  ${card('质量检查结论', '基准数据本身的健康程度，决定了后续实验结果的可信度。',
+    `<div class="notice info">
+      <strong>基准数据可用：</strong>重复率 ${pct(D.duplicate_ratio, 2)}，平均缺失率 ${pct(totalMiss, 2)}。
+      support_tickets 缺失率 ${pct(D.profile.find(p => p.field === 'support_tickets').missing, 2)} 已偏高，建议作为重点监控字段——
+      它同时是模型权重最高的特征，一旦缺失率进一步上升，模型表现最容易受到影响。
+    </div>`)}`;
+};
+
+/* 3. 场景配置 */
+VIEWS.scenarios = () => {
+  const kindName = {
+    control: '对照组', income_shift: '数值均值偏移', age_variance: '数值方差变化',
+    city_shift: '类别比例变化', plan_shift: '类别比例变化', device_shift: '类别比例变化',
+    missing_up: '缺失值增加', extreme: '极端值注入', tenure_shift: '数值均值偏移'
+  };
+  const active = D.scenarios.filter(s => s.kind !== 'control');
+  return `
+  <div class="card">
+    <div class="card-head">
+      <div><h3>选择要运行的场景</h3><p>已选择 ${SELECTED_SCENARIOS.size} / ${active.length} 个场景，另含 1 个对照组用于测量检测器自身的误报基线。</p></div>
+      <div style="display:flex;gap:8px;flex:0 0 auto">
+        <button class="btn" id="btnAll">全选</button>
+        <button class="btn" id="btnNone">清空</button>
+      </div>
+    </div>
+    <div class="grid g3">
+      ${active.map(s => `
+        <div class="scenario-card ${SELECTED_SCENARIOS.has(s.id) ? 'on' : ''}" data-scen="${s.id}">
+          <div class="check">✓</div>
+          <h4>${s.name}</h4>
+          <p>${s.desc}</p>
+          <div class="meta">
+            <span class="tag t-neutral">${kindName[s.kind] || s.kind}</span>
+            <span class="tag t-info">${s.detector.method === 'psi' ? 'PSI' : s.detector.method === 'ks' ? 'KS 检验' : s.detector.method === 'chi_square' ? '卡方检验' : '缺失率'}</span>
+            <span class="tag t-neutral mono">${s.detector.field}</span>
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>
+
+  ${card('对照组说明', '为什么必须保留一个"什么都不变"的场景。',
+    `<div class="notice info">
+      <strong>对照组用于测量误报基线：</strong>对基准数据不做任何变换再跑一次检测。如果检测器在这种情况下仍然报出漂移，
+      说明阈值本身过于敏感。任何在对照组上触发的告警都会在校准阶段被计为误报。
+    </div>`)}
+
+  ${card('场景配置预览', '导出或保存的场景配置，可直接用于复现实验。',
+    `<pre>${JSON.stringify({
+      reference_dataset: 'data/sample/churn_reference.csv',
+      label_column: D.label,
+      random_seed: 42,
+      selected_scenarios: Array.from(SELECTED_SCENARIOS),
+      scenarios: D.scenarios.filter(s => SELECTED_SCENARIOS.has(s.id)).map(s => ({
+        id: s.id, type: s.kind, column: s.detector.field,
+        intensity: s.intensity, detector: s.detector.method
+      }))
+    }, null, 2)}</pre>`)}`;
+};
+BIND.scenarios = () => {
+  document.querySelectorAll('[data-scen]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.scen;
+      if (SELECTED_SCENARIOS.has(id)) SELECTED_SCENARIOS.delete(id);
+      else SELECTED_SCENARIOS.add(id);
+      go('scenarios');
+    };
+  });
+  $('#btnAll').onclick = () => {
+    SELECTED_SCENARIOS = new Set(D.scenarios.filter(s => s.kind !== 'control').map(s => s.id));
+    go('scenarios');
+  };
+  $('#btnNone').onclick = () => { SELECTED_SCENARIOS = new Set(); go('scenarios'); };
+};
+
+/* 4. 漂移检测 */
+VIEWS.detection = () => {
+  const sel = D.scenarios.find(s => s.id === SELECTED_SCENARIO);
+  const numF = sel.fields.filter(f => f.type === 'numeric');
+  const catF = sel.fields.filter(f => f.type === 'categorical');
+  const hist = D.histograms[sel.id] || D.histograms[sel.detector.field];
+  const warn = D.calibration.psi.best.threshold, crit = warn + 0.1;
+  return `
+  <div class="card">
+    <div class="card-head"><div><h3>切换场景</h3><p>选择任意场景查看其字段级检测结果。</p></div></div>
+    <div class="pill-row">${D.scenarios.map(s =>
+      `<button class="pill ${s.id === SELECTED_SCENARIO ? 'on' : ''}" data-sc="${s.id}">${s.name}</button>`).join('')}</div>
+  </div>
+
+  ${card(`${sel.name} — 数值字段`, `PSI 衡量分布整体偏移，KS 检验衡量累积分布差异。预警阈值 ${fmt(warn, 2)}，严重阈值 ${fmt(crit, 2)}。`,
+    `<div class="tbl-wrap"><table>
+      <thead><tr><th>字段</th><th class="num-cell">PSI</th><th class="num-cell">KS</th><th>风险等级</th>
+      <th class="num-cell">基准缺失率</th><th class="num-cell">场景缺失率</th></tr></thead>
+      <tbody>${numF.map(f => `
+        <tr>
+          <td class="mono">${f.field}</td>
+          <td class="num-cell" style="color:${f.psi >= crit ? C.red : f.psi >= warn ? C.amber : 'inherit'};font-weight:${f.psi >= warn ? 600 : 400}">${fmt(f.psi, 4)}</td>
+          <td class="num-cell">${fmt(f.ks, 4)}</td>
+          <td>${riskTag(f.psi, warn, crit)}</td>
+          <td class="num-cell">${pct(f.miss_ref, 2)}</td>
+          <td class="num-cell">${f.miss_cur > f.miss_ref + 0.001 ? `<span style="color:${C.amber};font-weight:600">${pct(f.miss_cur, 2)}</span>` : pct(f.miss_cur, 2)}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>`)}
+
+  <div class="grid g2">
+    ${card(`分布对比 — ${hist ? hist.field : sel.detector.field}`, '基准数据与场景数据的分箱计数对比，可直观看出分布位移。',
+      legend([{ c: C.indigo, t: '基准数据' }, { c: C.orange, t: '场景数据' }]) +
+      (hist ? histChart(hist) : '<p class="muted">该场景主字段为类别型，请见右侧类别对比。</p>'))}
+
+    ${card('类别字段检测', '卡方检验判断类别比例是否发生显著变化，PSI 同时给出偏离幅度。',
+      `<div class="tbl-wrap"><table>
+        <thead><tr><th>字段</th><th class="num-cell">PSI</th><th class="num-cell">χ²</th><th class="num-cell">p 值</th><th>结论</th></tr></thead>
+        <tbody>${catF.map(f => `
+          <tr><td class="mono">${f.field}</td>
+          <td class="num-cell">${fmt(f.psi, 4)}</td>
+          <td class="num-cell">${fmt(f.chi2, 2)}</td>
+          <td class="num-cell">${sig(f.pvalue)}</td>
+          <td>${f.pvalue < 0.01 ? '<span class="tag t-crit">显著变化</span>' : f.pvalue < 0.05 ? '<span class="tag t-warn">可能变化</span>' : '<span class="tag t-ok">无显著变化</span>'}</td></tr>`).join('')}
+        </tbody></table></div>`)}
+  </div>
+
+  ${(() => {
+    const main = catF.find(f => f.field === sel.detector.field);
+    if (!main) return '';
+    return card(`${main.field} 类别占比对比`, '基准与场景的类别结构差异。',
+      legend([{ c: C.indigo, t: '基准' }, { c: C.orange, t: '场景' }]) + catChart(main.levels));
+  })()}
+
+  ${card('方法边界', '每种检测器都有明确的统计假设，界面不做过度承诺。',
+    `<div class="tbl-wrap"><table>
+      <thead><tr><th>方法</th><th>适用字段</th><th>统计含义</th><th>假设与局限</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag t-info">PSI</span></td><td>数值 / 类别</td><td>分箱后计算基准与当前分布的对数比值之和</td><td>依赖分箱方式；无严格分布假设，跨数据集不可直接比较</td></tr>
+        <tr><td><span class="tag t-info">KS 检验</span></td><td>数值</td><td>两条累积分布函数的最大垂直距离</td><td>要求样本独立同分布；大样本下极小差异也会显著</td></tr>
+        <tr><td><span class="tag t-info">卡方检验</span></td><td>类别</td><td>检验观测频数与期望频数的偏离</td><td>要求期望频数足够大；同样受样本量影响</td></tr>
+        <tr><td><span class="tag t-info">缺失率</span></td><td>全部</td><td>字段空值比例的变化幅度</td><td>不涉及分布形状，最直接的数据质量信号</td></tr>
+      </tbody></table></div>`)}`;
+};
+BIND.detection = () => {
+  document.querySelectorAll('[data-sc]').forEach(b =>
+    b.onclick = () => { SELECTED_SCENARIO = b.dataset.sc; go('detection'); });
+};
+
+/* 5. 模型影响 */
+VIEWS.impact = () => {
+  const sel = D.scenarios.find(s => s.id === SELECTED_SCENARIO);
+  const b = D.baseline.metrics;
+  const cm = D.baseline.confusion, sc = sel.confusion;
+  const it = D.calibration.impact_set.find(i => i.id === sel.id);
+  const driftPsi = sel.fields.find(f => f.field === sel.detector.field)?.psi || 0;
+  const drifted = sel.detector.method === 'psi' ? driftPsi >= D.calibration.psi.best.threshold
+    : sel.detector.method === 'missing' ? (it?.miss_delta || 0) >= 0.10
+    : (sel.fields.find(f => f.field === sel.detector.field)?.pvalue ?? 1) < 0.05;
+  const methodLabel = { psi: 'PSI', ks: 'KS 统计量', chi_square: '卡方检验', missing: '缺失率变化' }[sel.detector.method];
+  const statValue = sel.detector.method === 'missing' ? fmt(it?.miss_delta, 4) : fmt(driftPsi, 4);
+  const predShift = Math.abs(sel.metrics.pred_pos_rate - b.pred_pos_rate) > 0.01;
+  const driftText = sel.detector.field === '—'
+    ? '对照组不施加任何变换，作为检测器自身的误报基线。'
+    : `主检测字段 ${sel.detector.field} 的${methodLabel}为 ${statValue}，`
+      + (drifted ? '超过阈值，判定输入分布相对基准发生了变化。' : '未超过阈值，输入分布与基准基本一致。');
+
+  return `
+  <div class="card">
+    <div class="card-head"><div><h3>切换场景</h3><p>同一份模型，不同的输入压力。</p></div></div>
+    <div class="pill-row">${D.scenarios.map(s =>
+      `<button class="pill ${s.id === SELECTED_SCENARIO ? 'on' : ''}" data-sc="${s.id}">${s.name}</button>`).join('')}</div>
+  </div>
+
+  ${card('分层结论', '严格区分三个层次：有数据变化、模型输出变化、确认性能下降。三者不能互相替代。',
+    `<div class="verdict ${drifted ? 'observed' : 'safe'}">
+      <h4>① 数据漂移：${drifted ? '已检测到' : '未检测到'}</h4>
+      <p>${driftText}</p>
+    </div>
+    <div class="verdict ${predShift ? 'observed' : 'safe'}">
+      <h4>② 预测漂移：模型输出${predShift ? '发生变化' : '基本稳定'}</h4>
+      <p>预测为正类的比例由 ${pct(b.pred_pos_rate)} 变为 ${pct(sel.metrics.pred_pos_rate)}（${deltaNeutral(b.pred_pos_rate, sel.metrics.pred_pos_rate)}）。
+      ${predShift ? '模型对同一批客户的行为已经不同。' : '模型的整体判断倾向未变。'}</p>
+    </div>
+    <div class="verdict ${it?.impacted ? 'impact' : 'safe'}">
+      <h4>③ 性能变化：${it?.impacted ? '确认下降' : '无显著下降'}</h4>
+      <p>F1 由 ${fmt(b.f1, 4)} 变为 ${fmt(sel.metrics.f1, 4)}（${deltaCell(b.f1, sel.metrics.f1)}），
+      Recall ${fmt(b.recall, 4)} → ${fmt(sel.metrics.recall, 4)}，AUC ${fmt(b.auc, 4)} → ${fmt(sel.metrics.auc, 4)}。
+      ${it?.impacted ? `下降幅度已超过 ${D.calibration.impact_delta}，可判定为真实性能下降。` : `下降幅度未超过 ${D.calibration.impact_delta}，模型在该变换下保持可用。`}</p>
+    </div>
+    <div class="verdict nolabel">
+      <h4>④ 如果没有真实标签会怎样</h4>
+      <p>本数据集带有 ${D.label} 标签，因此可以计算 ①②③。若数据不含真实标签，界面只能呈现数据分布、缺失率、预测类别比例与概率分布，
+      <strong>无法计算 F1、Recall、AUC，也无法确认性能下降</strong>——结论只能停留在「发现了数据变化」，平台不会用漂移分数代替性能结论。</p>
+    </div>`)}
+
+  <div class="grid g2">
+    ${card('指标对比', '基准数据与当前场景的模型表现。',
+      legend([{ c: C.indigo, t: '基准数据' }, { c: C.orange, t: '场景数据' }]) +
+      metricBars([
+        { label: 'Accuracy', base: b.accuracy, cur: sel.metrics.accuracy },
+        { label: 'Precision', base: b.precision, cur: sel.metrics.precision },
+        { label: 'Recall', base: b.recall, cur: sel.metrics.recall },
+        { label: 'F1', base: b.f1, cur: sel.metrics.f1 },
+        { label: 'ROC-AUC', base: b.auc, cur: sel.metrics.auc },
+        { label: '预测正类占比', base: b.pred_pos_rate, cur: sel.metrics.pred_pos_rate },
+      ]))}
+    ${card('ROC 曲线对比', 'AUC 反映整体排序能力，对判定阈值不敏感。',
+      legend([{ c: C.indigo, t: `基准 AUC ${fmt(b.auc, 4)}` }, { c: C.orange, t: `场景 AUC ${fmt(sel.metrics.auc, 4)}` }]) +
+      rocChart(D.baseline.roc, sel.roc))}
+  </div>
+
+  <div class="grid g2">
+    ${card('混淆矩阵对比', 'TP / FP / FN / TN 的绝对数量变化能定位性能下降的具体来源。',
+      `<div class="grid g2" style="gap:20px">
+        <div><h4 style="font-size:12.5px;color:var(--text-2);margin-bottom:10px">基准数据</h4>
+          <div class="cm">
+            <div></div><div class="hd">预测 正</div><div class="hd">预测 负</div>
+            <div class="lbl">实际 正</div><div class="cell tp">${cm.tp}<small>TP</small></div><div class="cell fn">${cm.fn}<small>FN</small></div>
+            <div class="lbl">实际 负</div><div class="cell fp">${cm.fp}<small>FP</small></div><div class="cell tn">${cm.tn}<small>TN</small></div>
+          </div></div>
+        <div><h4 style="font-size:12.5px;color:var(--text-2);margin-bottom:10px">场景数据</h4>
+          <div class="cm">
+            <div></div><div class="hd">预测 正</div><div class="hd">预测 负</div>
+            <div class="lbl">实际 正</div><div class="cell tp">${sc.tp}<small>TP</small></div><div class="cell fn">${sc.fn}<small>FN</small></div>
+            <div class="lbl">实际 负</div><div class="cell fp">${sc.fp}<small>FP</small></div><div class="cell tn">${sc.tn}<small>TN</small></div>
+          </div></div>
+      </div>
+      <hr class="sep">
+      <div class="kv"><span class="k">TP 变化</span><span class="v">${sc.tp - cm.tp >= 0 ? '+' : ''}${sc.tp - cm.tp}</span></div>
+      <div class="kv"><span class="k">FP 变化</span><span class="v">${sc.fp - cm.fp >= 0 ? '+' : ''}${sc.fp - cm.fp}</span></div>
+      <div class="kv"><span class="k">FN 变化</span><span class="v">${sc.fn - cm.fn >= 0 ? '+' : ''}${sc.fn - cm.fn}</span></div>
+      <div class="kv"><span class="k">TN 变化</span><span class="v">${sc.tn - cm.tn >= 0 ? '+' : ''}${sc.tn - cm.tn}</span></div>`)}
+
+    ${card('逐场景影响对照', '横向比较所有场景下模型受到的真实影响。',
+      `<div class="tbl-wrap"><table>
+        <thead><tr><th>场景</th><th class="num-cell">ΔF1</th><th class="num-cell">ΔRecall</th><th class="num-cell">ΔAUC</th><th>判定</th></tr></thead>
+        <tbody>${D.scenarios.map(s => {
+          const i = D.calibration.impact_set.find(x => x.id === s.id);
+          return `<tr><td>${s.name}</td>
+            <td class="num-cell">${deltaCell(b.f1, s.metrics.f1)}</td>
+            <td class="num-cell">${deltaCell(b.recall, s.metrics.recall)}</td>
+            <td class="num-cell">${deltaCell(b.auc, s.metrics.auc)}</td>
+            <td>${i?.impacted ? '<span class="tag t-crit">性能下降</span>' : '<span class="tag t-ok">无显著影响</span>'}</td></tr>`;
+        }).join('')}</tbody></table></div>
+      <div class="notice" style="margin-top:16px">
+        <strong>最值得监控的字段：</strong>support_tickets（模型权重 ${D.model.coef.support_tickets.toFixed(2)}，最高）与 income
+        （PSI ${fmt(D.scenarios.find(s => s.id === 'income_shift').fields.find(f => f.field === 'income').psi, 3)}）应优先纳入监控规则。
+      </div>`)}
+  </div>`;
+};
+BIND.impact = () => {
+  document.querySelectorAll('[data-sc]').forEach(b =>
+    b.onclick = () => { SELECTED_SCENARIO = b.dataset.sc; go('impact'); });
+};
+
+/* 6. 阈值校准 */
+VIEWS.calibration = () => {
+  const cal = D.calibration;
+  const fam = CALIB_FAMILY;
+  const rows = cal[fam].rows;
+  const best = cal[fam].best;
+  const famName = { psi: 'PSI 阈值', test: '检验类 p 值阈值', missing: '缺失率增量阈值' };
+  const imp = cal.impact_set.filter(i =>
+    fam === 'psi' ? i.method === 'psi' : fam === 'test' ? (i.method === 'ks' || i.method === 'chi_square') : i.method === 'missing');
+  return `
+  <div class="card">
+    <div class="card-head"><div><h3>校准方法</h3>
+      <p>把每个场景的真实影响作为「是否真的出问题」的答案，再检验不同阈值能否正确区分。F1 绝对下降 ≥ ${cal.impact_delta} 记为「有实际影响」。</p></div></div>
+    <div class="pill-row">${Object.keys(famName).map(k =>
+      `<button class="pill ${k === fam ? 'on' : ''}" data-fam="${k}">${famName[k]}</button>`).join('')}</div>
+    <div class="notice info" style="margin-top:16px">
+      <strong>为什么按检测器家族分别校准：</strong>PSI 阈值、检验类 p 值阈值与缺失率阈值是三种不同的判定尺度，混用会产生误导。
+      当前查看的是「${famName[fam]}」，共 ${imp.length} 个场景参与校准。
+    </div>
+  </div>
+
+  <div class="grid g2">
+    ${card('阈值权衡曲线', '不同阈值下误报率、漏报率与检测能力的此消彼长。',
+      legend([{ c: C.red, t: '误报率' }, { c: C.amber, t: '漏报率' }, { c: C.green, t: '检测召回' }, { c: C.indigo, t: '检测精确率' }]) +
+      sweepChart(rows))}
+
+    ${card('推荐阈值', '在检测能力与噪声之间取平衡后的推荐值。',
+      `<div class="grid" style="grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px">
+        ${statCard('推荐阈值', fam === 'test' ? `p < ${best.threshold}` : `≥ ${fmt(best.threshold, 2)}`)}
+        ${statCard('检测召回率', pct(best.recall))}
+        ${statCard('误报率', pct(best.false_alarm_rate))}
+        ${statCard('漏报率', pct(best.miss_rate))}
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>阈值</th><th class="num-cell">TP</th><th class="num-cell">FP</th><th class="num-cell">FN</th><th class="num-cell">TN</th><th class="num-cell">误报率</th><th class="num-cell">漏报率</th></tr></thead>
+        <tbody>${rows.map(r => `
+          <tr style="${r.threshold === best.threshold ? 'background:var(--green-soft)' : ''}">
+            <td class="mono">${fam === 'test' ? 'p < ' + r.threshold : r.threshold}${r.threshold === best.threshold ? ' <span class="tag t-ok">推荐</span>' : ''}</td>
+            <td class="num-cell">${r.tp}</td><td class="num-cell">${r.fp}</td>
+            <td class="num-cell">${r.fn}</td><td class="num-cell">${r.tn}</td>
+            <td class="num-cell" style="color:${r.false_alarm_rate > 0.3 ? C.red : 'inherit'}">${pct(r.false_alarm_rate, 0)}</td>
+            <td class="num-cell" style="color:${r.miss_rate > 0.3 ? C.red : 'inherit'}">${pct(r.miss_rate, 0)}</td>
+          </tr>`).join('')}</tbody>
+      </table></div>`)}
+  </div>
+
+  ${card('校准明细', `逐条列出 ${imp.length} 个场景的检测器输出与真实影响，并标记误判。`,
+    `<div class="tbl-wrap"><table>
+      <thead><tr><th>场景</th><th>检测字段</th><th>方法</th><th class="num-cell">统计量</th><th class="num-cell">F1</th><th class="num-cell">ΔF1</th><th>真实影响</th><th>推荐阈值下</th></tr></thead>
+      <tbody>${imp.map(i => {
+        const stat = i.method === 'psi' ? 'PSI ' + fmt(i.psi, 4)
+          : i.method === 'missing' ? 'Δ缺失 ' + fmt(i.miss_delta, 4)
+          : i.method === 'ks' ? 'KS ' + fmt(i.ks, 4) + ' / p=' + sig(i.pvalue)
+          : 'χ² ' + fmt(i.chi2, 1) + ' / p=' + sig(i.pvalue);
+        const detected = i.method === 'psi' ? i.psi >= best.threshold
+          : i.method === 'missing' ? i.miss_delta >= best.threshold
+          : i.pvalue < best.threshold;
+        const correct = detected === i.impacted;
+        return `<tr>
+          <td>${i.name}</td><td class="mono">${i.field}</td>
+          <td><span class="tag t-neutral">${i.method === 'psi' ? 'PSI' : i.method === 'ks' ? 'KS' : i.method === 'chi_square' ? 'χ²' : '缺失率'}</span></td>
+          <td class="num-cell">${stat}</td>
+          <td class="num-cell">${fmt(i.f1, 4)}</td>
+          <td class="num-cell">${deltaCell(D.baseline.metrics.f1, i.f1)}</td>
+          <td>${i.impacted ? '<span class="tag t-crit">有影响</span>' : '<span class="tag t-ok">无影响</span>'}</td>
+          <td>${detected ? '<span class="tag t-info">已报出</span>' : '<span class="tag t-neutral">未报出</span>'}${correct ? '' : ' <span class="tag t-warn">误判</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`)}
+
+  ${card('阈值的适用边界', '这一节是本平台刻意保留的免责声明。',
+    `<div class="notice">
+      <strong>这些阈值只对当前基准数据和压力场景负责。</strong>它们来自 ${imp.length} 个人工构造场景的实验结果，
+      不能声称对所有数据集通用。更换数据分布、样本量或模型后必须重新校准。
+      检测延迟与多时间窗口漂移属于后续版本（V1.1）能力，当前版本尚未实现。
+    </div>`)}`;
+};
+BIND.calibration = () => {
+  document.querySelectorAll('[data-fam]').forEach(b =>
+    b.onclick = () => { CALIB_FAMILY = b.dataset.fam; go('calibration'); });
+};
+
+/* 7. 报告与导出 */
+function toYaml(obj, indent = 0) {
+  const pad = '  '.repeat(indent);
+  let out = '';
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v === null || v === undefined) { out += `${pad}${k}: null\n`; }
+    else if (Array.isArray(v)) {
+      if (v.length === 0) { out += `${pad}${k}: []\n`; return; }
+      out += `${pad}${k}:\n`;
+      v.forEach(it => {
+        if (it && typeof it === 'object') {
+          Object.entries(it).forEach(([ik, iv], idx) => {
+            const prefix = idx === 0 ? `${pad}  - ` : `${pad}    `;
+            out += iv !== null && typeof iv === 'object'
+              ? `${prefix}${ik}:\n${toYaml(iv, indent + 3)}`
+              : `${prefix}${ik}: ${typeof iv === 'string' ? `'${iv}'` : iv}\n`;
+          });
+        } else out += `${pad}  - ${it}\n`;
+      });
+    }
+    else if (typeof v === 'object') out += `${pad}${k}:\n${toYaml(v, indent + 1)}`;
+    else out += `${pad}${k}: ${typeof v === 'string' ? `'${v}'` : v}\n`;
+  });
+  return out;
+}
+
+function buildConfig() {
+  const c = JSON.parse(JSON.stringify(D.config));
+  c.generated_at = '2026-11-13T22:00:00+08:00';
+  c.reference = { rows: D.meta.n_rows, seed: D.meta.seed, label_column: D.label };
+  c.experiments = D.scenarios.map(s => ({
+    id: s.id, detector: s.detector.method, field: s.detector.field,
+    f1: s.metrics.f1, f1_delta: Number((s.metrics.f1 - D.baseline.metrics.f1).toFixed(4))
+  }));
+  return c;
+}
+
+VIEWS.report = () => {
+  const cfg = buildConfig();
+  const b = D.baseline.metrics;
+  const imp = D.calibration.impact_set;
+  const affected = imp.filter(i => i.impacted);
+  const stable = imp.filter(i => !i.impacted && i.id !== 'control');
+  const best = D.calibration.psi.best;
+  const incShift = D.scenarios.find(s => s.id === 'income_shift');
+  const missUp = D.scenarios.find(s => s.id === 'missing_up');
+  const devShift = D.scenarios.find(s => s.id === 'device_shift');
+
+  return `
+  ${card('实验结论摘要', '本次压力测试的核心发现，可直接用于实验报告或上线评审。',
+    `<div class="grid g4" style="margin-bottom:20px">
+      ${statCard('基准 F1', fmt(b.f1, 4), '基准数据上的模型表现')}
+      ${statCard('基准 AUC', fmt(b.auc, 4), 'ROC 曲线下面积')}
+      ${statCard('性能下降场景', `${affected.length} / ${imp.length}`, `F1 下降 ≥ ${D.calibration.impact_delta}`)}
+      ${statCard('推荐 PSI 预警阈值', fmt(best.threshold, 2), `严重阈值 ${fmt(best.threshold + 0.1, 2)}`)}
+    </div>
+    <div class="verdict observed">
+      <h4>发现 1 · 输入分布确实会发生显著变化</h4>
+      <p>income 均值上移 20% 触发 PSI ${fmt(incShift.fields.find(f => f.field === 'income').psi, 3)}，超过预警阈值。
+      随着强度从 +10% 增加到 +30%，PSI 从 0.074 升至 0.538，但 F1 仅下降 0.041——漂移分数与性能影响并不同比例。</p>
+    </div>
+    <div class="verdict impact">
+      <h4>发现 2 · 缺失率是本次实验中最危险的信号</h4>
+      <p>support_tickets 缺失率从 ${pct(missUp.fields.find(f => f.field === 'support_tickets').miss_ref, 1)} 升至
+      ${pct(missUp.fields.find(f => f.field === 'support_tickets').miss_cur, 1)} 时，F1 由 ${fmt(b.f1, 4)} 降至 ${fmt(missUp.metrics.f1, 4)}，
+      是所有场景中降幅最大的一项。该字段同时是模型权重最高的特征（${D.model.coef.support_tickets.toFixed(2)}），应优先纳入监控。</p>
+    </div>
+    <div class="verdict safe">
+      <h4>发现 3 · 漂移显著不代表模型失效</h4>
+      <p>device 结构变化使卡方检验 p 值远小于 0.05，但 F1 变化仅 ${fmt(devShift.metrics.f1 - b.f1, 4)}。
+      若仅凭漂移分数告警，这里会产生误报。这正是需要把「数据漂移」与「性能下降」分层呈现的原因。</p>
+    </div>
+    <div class="verdict nolabel">
+      <h4>发现 4 · 检验类检测器在大样本下过于敏感</h4>
+      <p>在 ${D.meta.n_rows.toLocaleString()} 行样本上，KS 与卡方检验对极小的分布差异也会返回显著 p 值，检验类场景的误报率达到
+      ${pct(D.calibration.test.best.false_alarm_rate, 0)}。因此阈值校准必须按检测器家族分别进行，不能用同一套阈值尺度。</p>
+    </div>`)}
+
+  <div class="grid g2">
+    ${card('YAML 监控配置', '可直接接入线上监控服务的配置格式。',
+      `<div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn" onclick="copyCfg('yaml')">复制</button>
+        <button class="btn" onclick="downloadCfg()">下载 .yaml</button>
+      </div><pre>${toYaml(cfg).replace(/</g, '&lt;')}</pre>`)}
+
+    ${card('JSON 监控配置', '同一份配置的 JSON 表示，便于程序化处理。',
+      `<div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn" onclick="copyCfg('json')">复制</button>
+        <button class="btn" onclick="downloadCfg()">下载 .json</button>
+      </div><pre>${JSON.stringify(cfg, null, 2).replace(/</g, '&lt;')}</pre>`)}
+  </div>
+
+  ${card('配置包含什么，刻意不包含什么', '本地优先的隐私设计在导出环节同样成立。',
+    `<div class="grid g2">
+      <div class="verdict observed">
+        <h4>包含</h4>
+        <p>模型名称与版本、每个字段的检测方法、预警与严重阈值、全局规则（缺失率、预测比例变化、性能下降）、
+        监控窗口、最小样本数，以及本次校准的全部实验记录，便于追溯阈值来源。</p>
+      </div>
+      <div class="verdict nolabel">
+        <h4>刻意不包含</h4>
+        <p>不包含原始数据、模型权重或任何生产样本。所有敏感内容留在本地；线上侧只拿到阈值与方法约定，
+        不需要知道漂移来自哪条具体记录。</p>
+      </div>
+    </div>
+    <div class="notice" style="margin-top:18px">
+      <strong>使用提醒：</strong>配置中的阈值来自本次离线压力测试，换数据后需要重新校准，不应直接当作通用标准套用到线上。
+    </div>`)}
+
+  ${card('下一步建议', '本原型验证了完整链路，后续按这个顺序推进。',
+    `<div class="grid g3">
+      ${statCard('接入真实数据', '实现 CSV 上传与字段识别', '当前为演示数据集')}
+      ${statCard('对接用户模型', '实现本地模型适配器加载', '当前为内置示例模型')}
+      ${statCard('持久化实验', '保存实验历史与配置', '当前刷新即重置')}
+    </div>`)}`;
+};
+
+/* ---------- 导出 ---------- */
+function copyCfg(kind) {
+  const cfg = buildConfig();
+  const text = kind === 'yaml' ? toYaml(cfg) : JSON.stringify(cfg, null, 2);
+  const done = btn => {
+    if (!btn) return;
+    const o = btn.textContent;
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => btn.textContent = o, 1400);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => done([...document.querySelectorAll('.btn')].find(b => b.textContent === '复制')))
+      .catch(() => fallbackCopy(text));
+  } else fallbackCopy(text);
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  ta.remove();
+}
+function downloadCfg() {
+  const blob = new Blob([toYaml(buildConfig())], { type: 'text/yaml;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'monitoring_config.yaml';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- 启动 ---------- */
+renderSteps();
+go('setup');
+</script>
+</body>
+</html>

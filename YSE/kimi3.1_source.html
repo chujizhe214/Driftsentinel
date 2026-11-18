@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DriftSentinel · 压力扫描台</title>
+<style>
+:root{
+  --bg:#0b0f16;
+  --panel:#111722;
+  --panel-2:#161e2c;
+  --panel-3:#1c2636;
+  --border:#1e2735;
+  --border-2:#2b3850;
+  --grid:#18202e;
+  --text:#dbe4f0;
+  --text-2:#8b98ab;
+  --text-3:#5a6a80;
+  --cyan:#22d3ee;
+  --cyan-dim:#155e75;
+  --green:#4ade80;
+  --amber:#fbbf24;
+  --red:#f87171;
+  --violet:#a78bfa;
+  --mono:'SF Mono',Menlo,Consolas,'Cascadia Code',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font:13.5px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
+
+/* ---------- 顶栏 ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 26px;border-bottom:1px solid var(--border);
+  background:rgba(11,15,22,.92);backdrop-filter:blur(8px);position:sticky;top:0;z-index:40;
+}
+.brand{display:flex;align-items:center;gap:11px}
+.brand .mark{
+  width:28px;height:28px;border-radius:7px;border:1.5px solid var(--cyan);
+  display:grid;place-items:center;color:var(--cyan);font-size:12px;font-weight:700;
+  font-family:var(--mono);
+}
+.brand h1{font-size:14.5px;font-weight:650;letter-spacing:.3px}
+.brand .sub{font-size:10.5px;color:var(--text-3);font-family:var(--mono);letter-spacing:.5px;margin-top:1px}
+.top-right{display:flex;align-items:center;gap:10px}
+.mode-tag{
+  display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-2);
+  font-family:var(--mono);border:1px solid var(--border);padding:5px 11px;border-radius:5px;
+}
+.mode-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 15px;border-radius:6px;
+  font-size:12.5px;font-weight:600;border:1px solid var(--border-2);background:var(--panel-2);
+  transition:.13s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--text-3);background:var(--panel-3)}
+.btn.primary{background:var(--cyan);border-color:var(--cyan);color:#06222b}
+.btn.primary:hover{background:#67e8f9;border-color:#67e8f9}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn .spin{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- 仪器读数条 ---------- */
+.deck{
+  display:flex;align-items:stretch;border-bottom:1px solid var(--border);
+  background:var(--panel);overflow-x:auto;
+}
+.deck-item{
+  padding:12px 22px;border-right:1px solid var(--border);min-width:0;flex:0 0 auto;
+}
+.deck-item .k{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-bottom:4px}
+.deck-item .v{font-size:14px;font-weight:650;font-family:var(--mono);white-space:nowrap}
+.deck-item .v small{font-size:11px;font-weight:400;color:var(--text-3)}
+.deck-item .v.cyan{color:var(--cyan)}
+.deck-item .v.green{color:var(--green)}
+.deck-run{margin-left:auto;display:flex;align-items:center;gap:14px;padding:10px 22px;border-right:none}
+.run-status{font-size:11px;color:var(--text-3);font-family:var(--mono);text-align:right;line-height:1.5}
+.run-status b{color:var(--green);font-weight:600}
+
+/* ---------- 主区 ---------- */
+.stage{display:grid;grid-template-columns:262px minmax(0,1fr);gap:0;align-items:stretch}
+/* 场景列表 */
+.scen-list{border-right:1px solid var(--border);background:var(--panel);padding:16px 0}
+.scen-list .lst-k{
+  font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:1.2px;
+  font-family:var(--mono);padding:0 18px 10px;
+}
+.scen-item{
+  display:block;width:100%;text-align:left;padding:12px 18px 12px 15px;
+  border-left:3px solid transparent;transition:.12s;position:relative;
+}
+.scen-item:hover{background:var(--panel-2)}
+.scen-item.on{background:var(--panel-2);border-left-color:var(--cyan)}
+.scen-item .nm{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.scen-item .fl{font-size:11px;color:var(--text-3);font-family:var(--mono);margin-top:3px}
+.scen-item .delta{
+  position:absolute;right:16px;top:13px;font-family:var(--mono);font-size:12px;font-weight:650;
+}
+.scen-item .bar{
+  height:3px;background:var(--panel-3);border-radius:2px;margin-top:9px;overflow:hidden;
+}
+.scen-item .bar i{display:block;height:100%;border-radius:2px}
+.scen-note{padding:14px 18px 0;font-size:11px;color:var(--text-3);line-height:1.7;border-top:1px solid var(--border);margin-top:14px}
+
+/* 主画布 */
+.scope{padding:20px 26px 24px;min-width:0}
+.scope-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.scope-head h2{font-size:19px;font-weight:650;letter-spacing:-.2px}
+.scope-head .desc{font-size:12.5px;color:var(--text-2);margin-top:5px;max-width:66ch;line-height:1.7}
+.scope-head .det-tag{
+  flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--cyan);
+  border:1px solid var(--cyan-dim);padding:5px 11px;border-radius:5px;background:rgba(34,211,238,.06);
+}
+/* 曲线面板 */
+.scope-panel{
+  background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:18px 20px 14px;position:relative;
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 39px,var(--grid) 39px,var(--grid) 40px);
+}
+.legend{display:flex;flex-wrap:wrap;gap:18px;font-size:11.5px;color:var(--text-2);margin-bottom:10px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:14px;height:2.5px;border-radius:2px;display:block}
+.legend i.dashed{height:0;border-top:2px dashed;width:16px}
+.legend i.cursorl{width:2px;height:12px;background:var(--text-2)}
+.scope-chart{width:100%}
+.scope-chart svg{width:100%;height:auto;display:block}
+.pt-hit{cursor:pointer}
+.pt-hit:hover circle.halo{opacity:.35}
+
+/* 游标控制 */
+.cursor-ctrl{display:flex;align-items:center;gap:16px;margin-top:14px}
+.cursor-ctrl .lbl{font-size:11px;color:var(--text-3);font-family:var(--mono);flex:0 0 auto}
+input[type=range]{flex:1;accent-color:var(--cyan);height:18px;cursor:pointer;min-width:0}
+.cursor-ctrl .cv{
+  font-family:var(--mono);font-size:13px;font-weight:650;color:var(--cyan);
+  min-width:130px;text-align:right;flex:0 0 auto;
+}
+/* 读数行 */
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:16px}
+.ro{background:var(--panel-2);padding:11px 14px}
+.ro .k{font-size:10px;color:var(--text-3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.ro .v{font-size:19px;font-weight:650;font-family:var(--mono);letter-spacing:-.4px;line-height:1.2}
+.ro .v small{font-size:11px;color:var(--text-3);font-weight:400}
+.ro .v.cyan{color:var(--cyan)} .ro .v.green{color:var(--green)}
+.ro .v.red{color:var(--red)} .ro .v.amber{color:var(--amber)}
+.ro .delta{font-size:11px;font-family:var(--mono);margin-top:3px}
+
+/* 三灯结论 */
+.lamps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.lamp{
+  background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:13px 16px;
+  display:flex;gap:12px;align-items:flex-start;transition:.2s;
+}
+.lamp .bulb{
+  width:11px;height:11px;border-radius:50%;margin-top:5px;flex:0 0 11px;
+  background:var(--panel-3);transition:.2s;
+}
+.lamp.on .bulb{background:currentColor;box-shadow:0 0 10px currentColor}
+.lamp .t{font-size:12.5px;font-weight:650;display:flex;align-items:center;gap:7px}
+.lamp .s{font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6}
+.lamp.cyan.on{border-color:var(--cyan-dim);color:var(--cyan)}
+.lamp.cyan:not(.on){color:var(--text-3)}
+.lamp.violet.on{border-color:#4c3a78;color:var(--violet)}
+.lamp.violet:not(.on){color:var(--text-3)}
+.lamp.red.on{border-color:#7f2d35;color:var(--red)}
+.lamp.red.safe{border-color:#1d4d33;color:var(--green)}
+.lamp.red.safe .bulb{background:var(--green);box-shadow:0 0 8px var(--green)}
+.lamp .t .st{font-size:10.5px;font-weight:600;font-family:var(--mono);padding:1px 7px;border-radius:4px;background:var(--panel-3);color:var(--text-2)}
+.lamp.on .t .st{background:rgba(255,255,255,.08);color:currentColor}
+.lamps-note{font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.7}
+
+/* ---------- 底部三栏 ---------- */
+.bay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);gap:0;border-top:1px solid var(--border)}
+.bay-cell{padding:20px 22px;border-right:1px solid var(--border);min-width:0}
+.bay-cell:last-child{border-right:none}
+.bay-cell h3{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);color:var(--text-2);margin-bottom:4px}
+.bay-cell .sub{font-size:11px;color:var(--text-3);margin-bottom:14px;line-height:1.6}
+/* 风险榜 */
+.risk-row{display:flex;align-items:center;gap:9px;margin-bottom:9px;font-size:12px}
+.risk-row .n{width:118px;flex:0 0 118px;font-family:var(--mono);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.risk-row .b{flex:1;height:14px;background:var(--panel-3);border-radius:3px;overflow:hidden;min-width:0}
+.risk-row .b i{display:block;height:100%;border-radius:3px;transition:width .25s}
+.risk-row .v{width:46px;flex:0 0 46px;text-align:right;font-family:var(--mono);font-size:11px}
+/* 校准 */
+.fam-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.fam-tab{
+  font-size:11px;font-family:var(--mono);padding:4px 11px;border-radius:5px;
+  border:1px solid var(--border-2);color:var(--text-3);
+}
+.fam-tab.on{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,.07)}
+.calib-stats{display:flex;gap:16px;flex-wrap:wrap;margin:12px 0 4px}
+.calib-stats .cs{flex:1;min-width:86px}
+.calib-stats .k{font-size:10px;color:var(--text-3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px}
+.calib-stats .v{font-size:17px;font-weight:650;font-family:var(--mono);margin-top:2px}
+.calib-note{font-size:10.5px;color:var(--text-3);line-height:1.7;margin-top:10px}
+/* 导出 */
+pre.yaml{
+  background:#0a0e15;border:1px solid var(--border);border-radius:7px;padding:13px 15px;
+  font-family:var(--mono);font-size:11px;line-height:1.65;color:#a8c5d8;
+  max-height:300px;overflow:auto;white-space:pre;
+}
+.export-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+footer.foot{
+  padding:16px 26px;border-top:1px solid var(--border);font-size:11px;color:var(--text-3);
+  font-family:var(--mono);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+@media(max-width:1150px){
+  .stage{grid-template-columns:1fr}
+  .scen-list{border-right:none;border-bottom:1px solid var(--border)}
+  .bay{grid-template-columns:1fr}
+  .bay-cell{border-right:none;border-bottom:1px solid var(--border)}
+  .lamps{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">DS</span>
+    <div>
+      <h1>DriftSentinel</h1>
+      <div class="sub">PRESSURE SCAN BENCH</div>
+    </div>
+  </div>
+  <div class="top-right">
+    <span class="mode-tag"><span class="dot"></span>本地仪器 · 演示模式</span>
+    <button class="btn" onclick="downloadYaml()">导出 YAML</button>
+  </div>
+</header>
+
+<!-- 仪器读数条 -->
+<div class="deck">
+  <div class="deck-item"><div class="k">基准数据集</div><div class="v">churn_reference <small>csv</small></div></div>
+  <div class="deck-item"><div class="k">样本</div><div class="v" id="deckRows"></div></div>
+  <div class="deck-item"><div class="k">模型</div><div class="v">LogReg <small>v1.0</small></div></div>
+  <div class="deck-item"><div class="k">基线 F1</div><div class="v green" id="deckF1"></div></div>
+  <div class="deck-item"><div class="k">基线 AUC</div><div class="v green" id="deckAuc"></div></div>
+  <div class="deck-item"><div class="k">种子</div><div class="v">42</div></div>
+  <div class="deck-run">
+    <div class="run-status" id="runStatus"></div>
+    <button class="btn primary" id="scanBtn" onclick="runScan()">
+      <svg id="scanIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8z"/></svg>
+      <span id="scanLbl">运行压力扫描</span>
+    </button>
+  </div>
+</div>
+
+<!-- 主区：场景 + 示波器 -->
+<div class="stage">
+  <aside class="scen-list">
+    <div class="lst-k">压力场景 · 6 类 × 7 档实测</div>
+    <div id="scenList"></div>
+    <div class="scen-note">
+      每档强度都是一次完整实测：生成场景数据 → 调用模型 → 计算指标。<br>
+      全程本地计算，随机种子固定，结果可复现。
+    </div>
+  </aside>
+
+  <section class="scope">
+    <div class="scope-head">
+      <div>
+        <h2 id="scName"></h2>
+        <div class="desc" id="scDesc"></div>
+      </div>
+      <span class="det-tag" id="scDet"></span>
+    </div>
+
+    <div class="scope-panel">
+      <div class="legend">
+        <span><i style="background:var(--cyan)"></i>漂移强度 PSI（左轴）</span>
+        <span><i style="background:var(--green)"></i>模型 F1（右轴）</span>
+        <span><i class="dashed" style="border-color:var(--amber)"></i>PSI 告警阈值 <b class="mono" id="legendTh"></b></span>
+        <span><i class="cursorl"></i>当前档位</span>
+      </div>
+      <div class="scope-chart" id="scopeChart"></div>
+      <div class="cursor-ctrl">
+        <span class="lbl">强度档位</span>
+        <input type="range" id="cursor" min="0" max="6" step="1" value="4">
+        <span class="cv" id="cursorLabel"></span>
+      </div>
+    </div>
+
+    <div class="readouts" id="readouts"></div>
+
+    <div class="lamps" id="lamps"></div>
+    <div class="lamps-note">
+      三盏灯相互独立：<b style="color:var(--cyan)">数据漂移</b>只看输入分布，<b style="color:var(--violet)">预测漂移</b>只看模型输出比例，
+      <b style="color:var(--red)">性能下降</b>必须有真实标签才能判定。漂移≠性能下降——age 与极端值两个场景就是反例。
+    </div>
+  </section>
+</div>
+
+<!-- 底部三栏 -->
+<div class="bay">
+  <div class="bay-cell">
+    <h3>字段风险榜</h3>
+    <div class="sub" id="riskSub"></div>
+    <div id="riskList"></div>
+  </div>
+  <div class="bay-cell">
+    <h3>阈值校准</h3>
+    <div class="sub" id="calibSub"></div>
+    <div class="fam-tabs" id="famTabs"></div>
+    <div id="calibChart"></div>
+    <div class="calib-stats" id="calibStats"></div>
+    <div class="calib-note" id="calibNote"></div>
+  </div>
+  <div class="bay-cell">
+    <h3>监控配置</h3>
+    <div class="sub">由本轮实测校准生成 · 含全部场景追溯信息</div>
+    <pre class="yaml" id="yamlBox"></pre>
+    <div class="export-actions">
+      <button class="btn" onclick="copyYaml()">复制</button>
+      <button class="btn" onclick="downloadYaml()">下载 .yaml</button>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  <span>DriftSentinel · 演示模式 · 数据与模型全程本机处理</span>
+  <span id="footStat"></span>
+</footer>
+
+<script>
+const DATA = __SCAN_DATA__;
+</script>
+<script>
+/* ============================================================
+   DriftSentinel · 压力扫描台
+   数据：6 类场景 × 7 档强度 = 42 个真实实测点（本地预计算）
+   ============================================================ */
+const D = DATA;
+const $ = s => document.querySelector(s);
+const fmt = (v, n = 3) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(n);
+const pct = (v, n = 1) => (v == null || isNaN(v)) ? '—' : (v * 100).toFixed(n) + '%';
+const esc = s => String(s).replace(/</g, '&lt;');
+
+const S = {
+  scenario: 'numeric_shift',
+  cursor: 4,            // 0-6 档位索引，默认 1.0 强度
+  fam: 'psi',
+  running: false,
+  scanned: true,
+};
+
+const DET_LABEL = { psi: 'PSI', ks: 'KS 检验', chi_square: '卡方检验', missing: '缺失率' };
+const C = { cyan:'#22d3ee', green:'#4ade80', amber:'#fbbf24', red:'#f87171',
+            violet:'#a78bfa', grid:'#1c2636', axis:'#2b3850', dim:'#5a6a80', text:'#8b98ab' };
+
+function scen() { return D.scenarios.find(s => s.id === S.scenario); }
+function point() { return scen().points[S.cursor]; }
+function thOf(fam) { return D.calibration[fam].best.threshold; }
+
+/* ---------- 主曲线：PSI + F1 双轴 + 阈值线 + 游标 ---------- */
+function scopeChart() {
+  const sc = scen();
+  const pts = sc.points;
+  const w = 720, h = 300;
+  const pad = { l: 52, r: 56, t: 16, b: 40 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const psiMax = Math.max(0.2, ...pts.map(p => p.psi)) * 1.15;
+  const f1Min = Math.min(...pts.map(p => p.f1)) - 0.02;
+  const f1Max = Math.max(D.baseline.f1, ...pts.map(p => p.f1)) + 0.02;
+  const X = i => pad.l + i / (pts.length - 1) * iw;
+  const Ypsi = v => pad.t + ih - v / psiMax * ih;
+  const Yf1 = v => pad.t + ih - (v - f1Min) / (f1Max - f1Min) * ih;
+  const th = thOf('psi');
+
+  let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="强度响应曲线">`;
+  /* 网格与双轴刻度 */
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + ih - ih * g / 4;
+    s += `<line x1="${pad.l}" y1="${y}" x2="${pad.l + iw}" y2="${y}" stroke="${C.grid}" stroke-width="1"/>`;
+    s += `<text x="${pad.l - 9}" y="${y + 3.5}" text-anchor="end" font-size="10.5" fill="${C.cyan}" font-family="monospace" opacity="0.75">${(psiMax * g / 4).toFixed(2)}</text>`;
+    s += `<text x="${pad.l + iw + 9}" y="${y + 3.5}" font-size="10.5" fill="${C.green}" font-family="monospace" opacity="0.75">${(f1Min + (f1Max - f1Min) * g / 4).toFixed(3)}</text>`;
+  }
+  s += `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${pad.l + iw}" y2="${pad.t + ih}" stroke="${C.axis}" stroke-width="1.2"/>`;
+  pts.forEach((p, i) => {
+    s += `<text x="${X(i)}" y="${h - 20}" text-anchor="middle" font-size="9.5" fill="${C.dim}" font-family="monospace">${p.level.toFixed(2)}</text>`;
+  });
+  s += `<text x="${pad.l + iw / 2}" y="${h - 3}" text-anchor="middle" font-size="10.5" fill="${C.dim}">相对强度（1.0 = 标准压力档）</text>`;
+
+  /* 阈值线 */
+  if (th < psiMax) {
+    s += `<line x1="${pad.l}" y1="${Ypsi(th)}" x2="${pad.l + iw}" y2="${Ypsi(th)}" stroke="${C.amber}" stroke-width="1.2" stroke-dasharray="6 4"/>`;
+    s += `<text x="${pad.l + 6}" y="${Ypsi(th) - 6}" font-size="10" fill="${C.amber}" font-family="monospace">PSI ≥ ${th.toFixed(2)} 告警</text>`;
+  }
+
+  /* PSI 曲线（青）与 F1 曲线（绿） */
+  s += '<path d="M' + pts.map((p, i) => `${X(i)},${Ypsi(p.psi)}`).join(' L') + `" fill="none" stroke="${C.cyan}" stroke-width="2"/>`;
+  s += '<path d="M' + pts.map((p, i) => `${X(i)},${Yf1(p.f1)}`).join(' L') + `" fill="none" stroke="${C.green}" stroke-width="2"/>`;
+
+  /* 实测点（可点击切换档位） */
+  pts.forEach((p, i) => {
+    const on = i === S.cursor;
+    s += `<g class="pt-hit" data-pt="${i}">`;
+    s += `<circle class="halo" cx="${X(i)}" cy="${Ypsi(p.psi)}" r="9" fill="${C.cyan}" opacity="${on ? 0.3 : 0}"/>`;
+    s += `<circle cx="${X(i)}" cy="${Ypsi(p.psi)}" r="${on ? 4.5 : 3}" fill="${C.cyan}"/>`;
+    s += `<circle cx="${X(i)}" cy="${Yf1(p.f1)}" r="${on ? 4.5 : 3}" fill="${C.green}"/>`;
+    s += `<rect x="${X(i) - 22}" y="${pad.t}" width="44" height="${ih}" fill="transparent"/>`;
+    s += '</g>';
+  });
+
+  /* 游标竖线 */
+  const cx = X(S.cursor);
+  s += `<line x1="${cx}" y1="${pad.t}" x2="${cx}" y2="${pad.t + ih}" stroke="#8b98ab" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"/>`;
+  s += '</svg>';
+  return s;
+}
+
+/* ---------- 读数 ---------- */
+function statReadout() {
+  const sc = scen(), p = point();
+  if (sc.detector === 'psi') return { k: 'PSI', v: fmt(p.psi, 3), cls: 'cyan' };
+  if (sc.detector === 'ks') return { k: 'KS 统计量', v: fmt(p.stat, 3), cls: 'cyan' };
+  if (sc.detector === 'chi_square') return { k: 'χ² 统计量', v: p.stat >= 1000 ? p.stat.toExponential(1) : fmt(p.stat, 1), cls: 'cyan' };
+  return { k: 'Δ 缺失率', v: '+' + pct(p.stat, 1), cls: 'cyan' };
+}
+function renderReadouts() {
+  const p = point(), b = D.baseline;
+  const dF1 = p.f1 - b.f1;
+  const dPred = p.pred_rate - b.pred_rate;
+  const sr = statReadout();
+  $('#readouts').innerHTML = `
+    <div class="ro"><div class="k">强度</div><div class="v" style="font-size:15px;padding-top:4px">${esc(p.label)}</div></div>
+    <div class="ro"><div class="k">PSI</div><div class="v cyan">${fmt(p.psi, 3)}</div></div>
+    <div class="ro"><div class="k">${sr.k}</div><div class="v cyan">${sr.v}</div></div>
+    <div class="ro"><div class="k">F1</div><div class="v ${dF1 <= -0.02 ? 'red' : 'green'}">${fmt(p.f1, 3)}</div>
+      <div class="delta" style="color:${dF1 <= -0.02 ? 'var(--red)' : 'var(--text-3)'}">${dF1 >= 0 ? '+' : ''}${dF1.toFixed(3)} vs 基线</div></div>
+    <div class="ro"><div class="k">Recall</div><div class="v">${fmt(p.recall, 3)}</div></div>
+    <div class="ro"><div class="k">AUC</div><div class="v">${fmt(p.auc, 3)}</div></div>
+    <div class="ro"><div class="k">预测正类占比</div><div class="v">${pct(p.pred_rate)}</div>
+      <div class="delta" style="color:var(--text-3)">${dPred >= 0 ? '+' : ''}${(dPred * 100).toFixed(1)} pp</div></div>`;
+}
+
+/* ---------- 三灯 ---------- */
+function renderLamps() {
+  const sc = scen(), p = point(), b = D.baseline;
+  const th = thOf(sc.detector === 'chi_square' || sc.detector === 'ks' ? 'test' : sc.detector);
+  let drifted, driftWhy;
+  if (sc.detector === 'psi') {
+    drifted = p.psi >= th;
+    driftWhy = `PSI ${fmt(p.psi, 3)} ${drifted ? '≥' : '<'} ${th.toFixed(2)}`;
+  } else if (sc.detector === 'ks') {
+    drifted = p.ks_pvalue != null && p.ks_pvalue < th;
+    driftWhy = `KS ${fmt(p.stat, 3)}，p ${p.ks_pvalue < 1e-4 ? '<1e-4' : '=' + p.ks_pvalue.toFixed(3)} ${drifted ? '显著' : '不显著'}`;
+  } else if (sc.detector === 'chi_square') {
+    drifted = p.pvalue != null && p.pvalue < th;
+    driftWhy = `χ² ${fmt(p.stat, 1)}，p ${p.pvalue < 1e-4 ? '<1e-4' : '=' + p.pvalue.toFixed(3)} ${drifted ? '显著' : '不显著'}`;
+  } else {
+    drifted = p.stat >= th;
+    driftWhy = `缺失率增量 ${pct(p.stat, 1)} ${drifted ? '≥' : '<'} ${pct(th, 0)}`;
+  }
+  const predShift = Math.abs(p.pred_rate - b.pred_rate) > 0.01;
+  const hurt = (b.f1 - p.f1) >= 0.02;
+
+  $('#lamps').innerHTML = `
+    <div class="lamp cyan ${drifted ? 'on' : ''}">
+      <span class="bulb"></span>
+      <div><div class="t">数据漂移 <span class="st">${drifted ? '检出' : '未检出'}</span></div>
+        <div class="s">${driftWhy} · 输入分布${drifted ? '偏离基准' : '与基准一致'}</div></div>
+    </div>
+    <div class="lamp violet ${predShift ? 'on' : ''}">
+      <span class="bulb"></span>
+      <div><div class="t">预测漂移 <span class="st">${predShift ? '变化' : '稳定'}</span></div>
+        <div class="s">正类预测占比 ${pct(b.pred_rate)} → ${pct(p.pred_rate)}，模型输出${predShift ? '倾向已改变' : '倾向基本不变'}</div></div>
+    </div>
+    <div class="lamp red ${hurt ? 'on' : 'safe'}">
+      <span class="bulb"></span>
+      <div><div class="t">性能下降 <span class="st">${hurt ? '确认' : '无显著下降'}</span></div>
+        <div class="s">F1 ${fmt(b.f1, 3)} → ${fmt(p.f1, 3)}（${hurt ? '降幅超 0.02，判定为真实性能下降' : '有真实标签，可判定模型仍然可用'}）</div></div>
+    </div>`;
+}
+
+/* ---------- 场景列表 ---------- */
+function renderScenList() {
+  $('#scenList').innerHTML = D.scenarios.map(sc => {
+    const last = sc.points[sc.points.length - 1];
+    const d = last.f1 - D.baseline.f1;
+    const maxPsi = Math.max(...sc.points.map(p => p.psi));
+    const wPct = Math.min(100, maxPsi / 0.6 * 100);
+    const col = d <= -0.02 ? 'var(--red)' : 'var(--green)';
+    return `
+    <button class="scen-item ${sc.id === S.scenario ? 'on' : ''}" data-sc="${sc.id}">
+      <div class="nm">${sc.name}</div>
+      <span class="delta" style="color:${col}">${d >= 0 ? '+' : ''}${d.toFixed(3)}</span>
+      <div class="fl">${sc.field} · ${DET_LABEL[sc.detector]}</div>
+      <div class="bar"><i style="width:${wPct}%;background:${col}"></i></div>
+    </button>`;
+  }).join('');
+  document.querySelectorAll('[data-sc]').forEach(b =>
+    b.onclick = () => { S.scenario = b.dataset.sc; S.cursor = 4; renderMain(); });
+}
+
+/* ---------- 风险榜 ---------- */
+function renderRisk() {
+  const sc = scen();
+  const rows = [...sc.fields_at_max].sort((a, b) => b.psi - a.psi);
+  const th = thOf('psi');
+  $('#riskSub').textContent = sc.name + ' · 最大档位（1.5×）下各字段 PSI，主检测字段 ' + sc.field;
+  $('#riskList').innerHTML = rows.map(f => {
+    const main = f.field === sc.field;
+    const col = f.psi >= th + 0.1 ? 'var(--red)' : f.psi >= th ? 'var(--amber)' : 'var(--cyan)';
+    const wPct = Math.min(100, f.psi / 0.6 * 100);
+    return `<div class="risk-row">
+      <span class="n" style="${main ? 'color:var(--text);font-weight:650' : ''}">${f.field}</span>
+      <span class="b"><i style="width:${wPct}%;background:${col}"></i></span>
+      <span class="v" style="color:${col}">${f.psi.toFixed(3)}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- 阈值校准 ---------- */
+function calibChart() {
+  const rows = D.calibration[S.fam].rows;
+  const w = 460, h = 200;
+  const pad = { l: 40, r: 12, t: 12, b: 34 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const xs = rows.map(r => r.threshold);
+  const X = v => pad.l + (v - xs[0]) / (xs[xs.length - 1] - xs[0] || 1) * iw;
+  const Y = v => pad.t + ih - v * ih;
+  const series = [
+    { k: 'recall', c: C.green, t: '检测召回' },
+    { k: 'far', c: C.red, t: '误报率' },
+    { k: 'miss', c: C.amber, t: '漏报率' },
+  ];
+  let s = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + ih - ih * g / 4;
+    s += `<line x1="${pad.l}" y1="${y}" x2="${pad.l + iw}" y2="${y}" stroke="${C.grid}" stroke-width="1"/>`;
+    s += `<text x="${pad.l - 7}" y="${y + 3.5}" text-anchor="end" font-size="9.5" fill="${C.dim}" font-family="monospace">${g * 25}%</text>`;
+  }
+  series.forEach(se => {
+    s += '<path d="M' + rows.map(r => `${X(r.threshold)},${Y(r[se.k])}`).join(' L') + `" fill="none" stroke="${se.c}" stroke-width="1.8"/>`;
+    rows.forEach(r => { s += `<circle cx="${X(r.threshold)}" cy="${Y(r[se.k])}" r="2.4" fill="${se.c}"/>`; });
+  });
+  /* 推荐阈值竖线 */
+  const best = D.calibration[S.fam].best.threshold;
+  s += `<line x1="${X(best)}" y1="${pad.t}" x2="${X(best)}" y2="${pad.t + ih}" stroke="${C.cyan}" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  xs.forEach(v => { s += `<text x="${X(v)}" y="${h - 16}" text-anchor="middle" font-size="9" fill="${C.dim}" font-family="monospace">${v}</text>`; });
+  s += `<text x="${pad.l + iw / 2}" y="${h - 2}" text-anchor="middle" font-size="10" fill="${C.dim}">阈值（青虚线 = 推荐）</text>`;
+  s += '</svg>';
+  return s;
+}
+function renderCalib() {
+  const famName = { psi: 'PSI', test: '检验类 p 值', missing: '缺失率增量' };
+  $('#calibSub').textContent = `42 个实测点中排除 6 个基线档，取 ${D.calibration.n_points} 个校准样本（每档强度一个样本），F1 降幅 ≥0.02 定义为"真实影响"`;
+  $('#famTabs').innerHTML = Object.keys(famName).map(k =>
+    `<button class="fam-tab ${k === S.fam ? 'on' : ''}" data-fam="${k}">${famName[k]}</button>`).join('');
+  document.querySelectorAll('[data-fam]').forEach(b =>
+    b.onclick = () => { S.fam = b.dataset.fam; renderCalib(); });
+
+  $('#calibChart').innerHTML = `
+    <div class="legend" style="margin-bottom:4px">
+      <span><i style="background:${C.green}"></i>召回</span>
+      <span><i style="background:${C.red}"></i>误报</span>
+      <span><i style="background:${C.amber}"></i>漏报</span>
+    </div>` + calibChart();
+
+  const best = D.calibration[S.fam].best;
+  const thTxt = S.fam === 'test' ? 'p < ' + best.threshold : '≥ ' + best.threshold;
+  $('#calibStats').innerHTML = `
+    <div class="cs"><div class="k">推荐阈值</div><div class="v" style="color:var(--cyan)">${thTxt}</div></div>
+    <div class="cs"><div class="k">召回</div><div class="v" style="color:var(--green)">${pct(best.recall, 0)}</div></div>
+    <div class="cs"><div class="k">误报</div><div class="v" style="color:${best.far > 0.3 ? 'var(--red)' : 'var(--green)'}">${pct(best.far, 0)}</div></div>
+    <div class="cs"><div class="k">漏报</div><div class="v" style="color:${best.miss > 0.3 ? 'var(--red)' : 'var(--green)'}">${pct(best.miss, 0)}</div></div>`;
+  $('#calibNote').textContent = S.fam === 'test'
+    ? '注意：检验类检测器在 n=4000 时即使 p<0.005 误报率仍达 ' + pct(best.far, 0) + '——大样本下极小分布差异也会显著，必须与 PSI 族分开校准。'
+    : '阈值仅对当前基准数据与压力场景负责，更换数据后需重新校准。检测延迟与多时间窗口漂移属 V1.1 规划。';
+}
+
+/* ---------- 配置导出 ---------- */
+function buildCfg() {
+  return {
+    model_name: D.model.name,
+    model_version: D.model.version,
+    task_type: 'binary_classification',
+    seed: D.meta.seed,
+    scan_points: D.scenarios.length * 7,
+    calibration_points: D.calibration.n_points,
+    features: {
+      income: { method: 'psi', warning: thOf('psi'), critical: +(thOf('psi') + 0.1).toFixed(2) },
+      age: { method: 'ks', warning_pvalue: thOf('test') },
+      city: { method: 'chi_square', warning_pvalue: thOf('test') },
+      plan: { method: 'chi_square', warning_pvalue: thOf('test') },
+      support_tickets: { method: 'missing_rate', warning: thOf('missing') },
+    },
+    global_rules: { missing_rate_alert: 0.10, prediction_rate_change: 0.15, f1_drop_alert: 0.02 },
+    monitor_window: '1h', min_samples: 500,
+    note: '阈值基于本轮压力扫描实测推荐，换数据需重新校准',
+  };
+}
+function toYaml(o, ind = 0) {
+  const pad = '  '.repeat(ind);
+  let out = '';
+  for (const [k, v] of Object.entries(o)) {
+    if (v !== null && typeof v === 'object') out += `${pad}${k}:\n${toYaml(v, ind + 1)}`;
+    else out += `${pad}${k}: ${typeof v === 'string' ? `'${v}'` : v}\n`;
+  }
+  return out;
+}
+function renderYaml() { $('#yamlBox').textContent = toYaml(buildCfg()); }
+function copyYaml() {
+  const text = toYaml(buildCfg());
+  const done = () => {
+    const b = [...document.querySelectorAll('.export-actions .btn')].find(x => x.textContent === '复制');
+    if (b) { b.textContent = '已复制 ✓'; setTimeout(() => b.textContent = '复制', 1400); }
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done && done(); } catch (e) {}
+  ta.remove();
+}
+function downloadYaml() {
+  const blob = new Blob([toYaml(buildCfg())], { type: 'text/yaml;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'monitoring_config.yaml'; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- 运行扫描（演示动效；数据为本地预计算实测结果） ---------- */
+function runScan() {
+  if (S.running) return;
+  S.running = true;
+  const stages = ['读取基准数据', '生成 6×7 档场景', '调用模型预测', '计算漂移与性能指标', '校准阈值'];
+  let i = 0;
+  $('#scanLbl').textContent = '扫描中';
+  $('#scanIcon').innerHTML = '<path d="M12 3a9 9 0 1 0 9 9"/>';
+  $('#scanIcon').classList.add('spin');
+  $('#scanBtn').disabled = true;
+  const timer = setInterval(() => {
+    $('#runStatus').innerHTML = `<span style="color:var(--cyan)">${stages[i]}</span><br>${Math.round((i + 1) / stages.length * 100)}% · ${i + 1}/${stages.length}`;
+    i++;
+    if (i >= stages.length) {
+      clearInterval(timer);
+      S.running = false;
+      $('#scanLbl').textContent = '重新扫描';
+      $('#scanIcon').classList.remove('spin');
+      $('#scanIcon').innerHTML = '<path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/>';
+      $('#scanBtn').disabled = false;
+      $('#runStatus').innerHTML = `<b>扫描完成</b><br>${D.scenarios.length * 7} 个实测点 · 可复现`;
+    }
+  }, 480);
+}
+
+/* ---------- 渲染 ---------- */
+function renderMain() {
+  const sc = scen();
+  $('#scName').textContent = sc.name;
+  $('#scDesc').textContent = sc.desc;
+  $('#scDet').textContent = sc.field + ' · ' + DET_LABEL[sc.detector];
+  $('#scopeChart').innerHTML = scopeChart();
+  document.querySelectorAll('[data-pt]').forEach(g =>
+    g.onclick = () => { setCursor(Number(g.dataset.pt)); });
+  $('#cursor').value = S.cursor;
+  $('#cursorLabel').textContent = point().label;
+  renderReadouts();
+  renderLamps();
+  renderRisk();
+}
+function setCursor(i) {
+  S.cursor = i;
+  $('#cursor').value = i;
+  $('#cursorLabel').textContent = point().label;
+  /* 只重绘曲线游标与读数，避免整页跳动 */
+  $('#scopeChart').innerHTML = scopeChart();
+  document.querySelectorAll('[data-pt]').forEach(g =>
+    g.onclick = () => { setCursor(Number(g.dataset.pt)); });
+  renderReadouts();
+  renderLamps();
+}
+function renderStatic() {
+  $('#deckRows').textContent = D.meta.n.toLocaleString();
+  $('#deckF1').textContent = fmt(D.baseline.f1, 3);
+  $('#deckAuc').textContent = fmt(D.baseline.auc, 3);
+  $('#legendTh').textContent = thOf('psi').toFixed(2);
+  $('#runStatus').innerHTML = `<b>扫描完成</b><br>${D.scenarios.length * 7} 个实测点 · 可复现`;
+  $('#footStat').textContent = `${D.scenarios.length} 场景 × 7 档 = ${D.scenarios.length * 7} 实测点 · 基线 F1 ${fmt(D.baseline.f1, 3)} / AUC ${fmt(D.baseline.auc, 3)}`;
+  renderScenList();
+  renderCalib();
+  renderYaml();
+}
+
+$('#cursor').addEventListener('input', e => setCursor(Number(e.target.value)));
+renderStatic();
+renderMain();
+</script>
+</body>
+</html>
