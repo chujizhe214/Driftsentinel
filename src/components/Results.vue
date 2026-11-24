@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { ChartConfiguration } from 'chart.js'
-import type { Experiment } from '../types'
+import type { Experiment, Metrics } from '../types'
 import { number, percent } from '../api'
+import { chartPalette } from '../chartPalette'
 import Chart from './Chart.vue'
+import HelpTip from './HelpTip.vue'
 import Icon from './Icon.vue'
 import Modal from './Modal.vue'
 const props = defineProps<{ experiment: Experiment; compact?: boolean }>()
 const selectedId = ref('')
 const selectedField = ref('')
 const showField = ref(false)
+const visibleDistribution = ref({ reference: true, current: true })
 const result = computed(() => props.experiment.result!)
 const comparing = computed(() => props.experiment.request.mode === 'compare')
 watch(
@@ -26,18 +29,62 @@ const current = computed(
 )
 const baseline = computed(() => result.value.baseline)
 const metrics = computed(() => current.value.evaluation?.metrics)
+function classificationRates(metrics: Metrics | null | undefined) {
+  const [tn, fp] = metrics?.confusion[0] ?? [0, 0]
+  const [fn, tp] = metrics?.confusion[1] ?? [0, 0]
+  const negatives = tn + fp
+  const positives = fn + tp
+  const total = negatives + positives
+  return {
+    actualPositive: total ? positives / total : null,
+    falsePositive: negatives ? fp / negatives : null,
+    falseNegative: positives ? fn / positives : null,
+  }
+}
+const baselineRates = computed(() => classificationRates(baseline.value?.metrics))
+const currentRates = computed(() => classificationRates(metrics.value))
+const errorRates = [
+  {
+    key: 'falsePositive',
+    label: '模型误报率',
+    detail: '实际负类中，被模型误判为正类的比例。',
+    color: chartPalette.falseAlarm,
+  },
+  {
+    key: 'falseNegative',
+    label: '模型漏报率',
+    detail: '实际正类中，被模型漏判为负类的比例。',
+    color: chartPalette.missRate,
+  },
+] as const
+const modelMetricColors = {
+  accuracy: undefined,
+  precision: undefined,
+  recall: chartPalette.recall,
+  f1: chartPalette.f1,
+  auc: chartPalette.auc,
+}
 const field = computed(
   () => current.value.fields.find((f) => f.name === selectedField.value) || current.value.fields[0],
 )
 const changed = computed(() => current.value.fields.filter((f) => f.risk !== 'stable').length)
 const rule = computed(() => props.experiment.request.rules)
+function f1Status(drop: number | null, impacted: boolean | null) {
+  if (drop === null) return '无法确认'
+  if (impacted) return '触发 F1 下降告警'
+  if (-drop >= rule.value.impact) return 'F1 上升达到变化阈值'
+  return 'F1 变化未达阈值'
+}
+function signedPoints(change: number, digits = 1) {
+  const points = Number((change * 100).toFixed(digits))
+  return `${points > 0 ? '+' : ''}${points.toFixed(digits)}pp`
+}
 const predictionChanged = computed(() =>
   current.value.evaluation && baseline.value
     ? Math.abs(current.value.evaluation.positiveRate - baseline.value.positiveRate) >=
       rule.value.prediction_change
     : false,
 )
-const palette = ['#399b7e', '#6b92d3', '#d7ad58']
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -52,14 +99,20 @@ const chartOptions = {
         boxHeight: 5,
         boxWidth: 5,
         padding: 17,
-        color: '#849a8e',
+        color: chartPalette.text,
         font: { size: 10 },
       },
     },
   },
   scales: {
-    x: { grid: { display: false }, ticks: { color: '#94a79b', font: { size: 9 }, maxRotation: 0 } },
-    y: { grid: { color: '#eff3f0' }, ticks: { color: '#94a79b', font: { size: 9 } } },
+    x: {
+      grid: { display: false },
+      ticks: { color: chartPalette.text, font: { size: 9 }, maxRotation: 0 },
+    },
+    y: {
+      grid: { color: chartPalette.grid },
+      ticks: { color: chartPalette.text, font: { size: 9 } },
+    },
   },
 }
 const trend = computed<ChartConfiguration>(() => {
@@ -72,7 +125,7 @@ const trend = computed<ChartConfiguration>(() => {
           {
             label: '字段 PSI',
             data: current.value.fields.slice(0, 12).map((f) => f.psi),
-            backgroundColor: '#91b7a7',
+            backgroundColor: chartPalette.psi,
             borderRadius: 3,
           },
         ],
@@ -93,8 +146,8 @@ const trend = computed<ChartConfiguration>(() => {
               {
                 label: '模型 F1',
                 data: scenarios.map((s) => s.evaluation?.metrics?.f1 ?? null),
-                borderColor: palette[0],
-                backgroundColor: '#399b7e0a',
+                borderColor: chartPalette.f1,
+                backgroundColor: chartPalette.f1Fill,
                 fill: true,
                 tension: 0.25,
                 borderWidth: 2,
@@ -106,7 +159,7 @@ const trend = computed<ChartConfiguration>(() => {
         {
           label: '最大 PSI',
           data: scenarios.map((s) => s.maxPsi),
-          borderColor: palette[1],
+          borderColor: chartPalette.psi,
           borderDash: [5, 4],
           tension: 0.25,
           borderWidth: 2,
@@ -116,9 +169,9 @@ const trend = computed<ChartConfiguration>(() => {
         {
           label: 'PSI 预警阈值',
           data: scenarios.map(() => rule.value.warning),
-          borderColor: palette[2],
+          borderColor: chartPalette.threshold,
           borderDash: [3, 4],
-          borderWidth: 1,
+          borderWidth: 1.5,
           pointRadius: 0,
           yAxisID: 'y1',
         },
@@ -126,46 +179,73 @@ const trend = computed<ChartConfiguration>(() => {
     },
     options: {
       ...chartOptions,
+      plugins: {
+        legend: {
+          ...chartOptions.plugins.legend,
+          labels: { ...chartOptions.plugins.legend.labels, color: chartPalette.lineText },
+        },
+      },
       scales: {
-        ...chartOptions.scales,
+        x: {
+          ...chartOptions.scales.x,
+          ticks: { ...chartOptions.scales.x.ticks, color: chartPalette.lineText },
+        },
         y: {
           ...chartOptions.scales.y,
           min: 0,
           max: 1,
-          title: { display: true, text: 'F1', color: '#91a99a', font: { size: 9 } },
+          grid: { color: chartPalette.lineGrid },
+          ticks: { ...chartOptions.scales.y.ticks, color: chartPalette.f1 },
+          title: { display: true, text: 'F1', color: chartPalette.f1, font: { size: 9 } },
         },
         y1: {
           position: 'right',
           min: 0,
           grid: { drawOnChartArea: false },
-          title: { display: true, text: 'PSI', color: '#91a99a', font: { size: 9 } },
-          ticks: { color: '#94a79b', font: { size: 9 } },
+          title: { display: true, text: 'PSI', color: chartPalette.psi, font: { size: 9 } },
+          ticks: { color: chartPalette.psi, font: { size: 9 } },
         },
       },
     },
   }
 })
-const distChart = computed<ChartConfiguration>(() => ({
-  type: 'bar',
-  data: {
-    labels: field.value?.distribution.labels || [],
-    datasets: [
+const distributionSeries = computed(
+  () =>
+    [
+      { key: 'reference', label: '基准', color: chartPalette.distributionBaseline },
       {
-        label: '基准',
-        data: field.value?.distribution.reference || [],
-        backgroundColor: '#91b7a7',
-        borderRadius: 3,
-      },
-      {
+        key: 'current',
         label: comparing.value ? '待检测数据' : '当前场景',
-        data: field.value?.distribution.current || [],
-        backgroundColor: '#e4be73',
-        borderRadius: 3,
+        color: chartPalette.distributionScenario,
       },
-    ],
-  },
-  options: chartOptions,
-}))
+    ] as const,
+)
+const distChart = computed<ChartConfiguration>(() => {
+  const distribution = field.value?.distribution
+  const datasets = distributionSeries.value.map(({ key, label, color }) => ({
+    label,
+    data: distribution?.[key] ?? [],
+    backgroundColor: color,
+    borderRadius: 4,
+    hidden: !visibleDistribution.value[key],
+  }))
+  return {
+    type: 'bar',
+    data: { labels: distribution?.labels ?? [], datasets },
+    options: {
+      ...chartOptions,
+      plugins: { legend: { display: false } },
+      scales: {
+        ...chartOptions.scales,
+        y: {
+          ...chartOptions.scales.y,
+          beginAtZero: true,
+          suggestedMax: Math.max(0, ...datasets.flatMap(({ data }) => data)),
+        },
+      },
+    },
+  }
+})
 const roc = computed<ChartConfiguration>(() => ({
   type: 'line',
   data: {
@@ -173,14 +253,19 @@ const roc = computed<ChartConfiguration>(() => ({
       {
         label: `基准 AUC ${number(baseline.value?.metrics?.auc)}`,
         data: baseline.value?.metrics?.roc || [],
-        borderColor: palette[0],
+        borderColor: chartPalette.auc,
+        backgroundColor: chartPalette.auc,
+        pointStyle: 'circle',
         pointRadius: 0,
         borderWidth: 2,
       },
       {
         label: `${comparing.value ? '待检测' : '场景'} AUC ${number(metrics.value?.auc)}`,
         data: metrics.value?.roc || [],
-        borderColor: palette[1],
+        borderColor: chartPalette.auc,
+        backgroundColor: chartPalette.auc,
+        borderDash: [6, 4],
+        pointStyle: 'rectRot',
         pointRadius: 0,
         borderWidth: 2,
       },
@@ -188,20 +273,40 @@ const roc = computed<ChartConfiguration>(() => ({
   },
   options: {
     ...chartOptions,
+    plugins: {
+      legend: {
+        ...chartOptions.plugins.legend,
+        labels: {
+          ...chartOptions.plugins.legend.labels,
+          pointStyle: undefined,
+          color: chartPalette.auc,
+        },
+      },
+    },
     scales: {
       x: {
         type: 'linear',
         min: 0,
         max: 1,
-        grid: { color: '#eff3f0' },
-        title: { display: true, text: 'False positive rate', font: { size: 9 } },
-        ticks: { font: { size: 9 } },
+        grid: { color: chartPalette.grid },
+        title: {
+          display: true,
+          text: 'False positive rate',
+          color: chartPalette.text,
+          font: { size: 9 },
+        },
+        ticks: { color: chartPalette.text, font: { size: 9 } },
       },
       y: {
         ...chartOptions.scales.y,
         min: 0,
         max: 1,
-        title: { display: true, text: 'True positive rate', font: { size: 9 } },
+        title: {
+          display: true,
+          text: 'True positive rate',
+          color: chartPalette.text,
+          font: { size: 9 },
+        },
       },
     },
   },
@@ -217,14 +322,14 @@ const probabilities = computed<ChartConfiguration>(() => ({
       {
         label: '基准概率分布',
         data: baseline.value?.probability || [],
-        backgroundColor: '#91b7a7',
-        borderRadius: 3,
+        backgroundColor: chartPalette.distributionBaseline,
+        borderRadius: 4,
       },
       {
         label: comparing.value ? '待检测概率分布' : '场景概率分布',
         data: current.value.evaluation?.probability || [],
-        backgroundColor: '#e4be73',
-        borderRadius: 3,
+        backgroundColor: chartPalette.distributionScenario,
+        borderRadius: 4,
       },
     ],
   },
@@ -232,6 +337,7 @@ const probabilities = computed<ChartConfiguration>(() => ({
 }))
 function inspect(name: string) {
   selectedField.value = name
+  visibleDistribution.value = { reference: true, current: true }
   showField.value = true
 }
 </script>
@@ -264,7 +370,8 @@ function inspect(name: string) {
               ? '实际数据对比 · 全量样本'
               : result.scenarios.length + ' 个场景 · Seed ' + experiment.request.seed
           }}
-          · {{ result.duration.toFixed(2) }}s
+          ·
+          <span :style="{ color: chartPalette.duration }">{{ result.duration.toFixed(2) }}s</span>
         </span>
       </div>
       <div v-if="!comparing" class="form-field" style="min-width: 210px; max-width: 330px">
@@ -277,10 +384,18 @@ function inspect(name: string) {
     <div class="metrics-row">
       <div class="metric">
         <div class="metric-label">
-          <i class="metric-dot"></i>
+          <i
+            class="metric-dot"
+            :style="{
+              backgroundColor: comparing && !baseline?.metrics ? undefined : chartPalette.f1,
+            }"
+          ></i>
           {{ comparing && !baseline?.metrics ? '基准样本' : '基准 F1' }}
         </div>
-        <div class="metric-number">
+        <div
+          class="metric-number"
+          :style="{ color: comparing && !baseline?.metrics ? undefined : chartPalette.f1 }"
+        >
           {{
             comparing && !baseline?.metrics
               ? result.rows.toLocaleString()
@@ -299,31 +414,36 @@ function inspect(name: string) {
       </div>
       <div class="metric">
         <div class="metric-label">
-          <i class="metric-dot" style="background: #d8b05c"></i>
+          <i
+            class="metric-dot"
+            :style="{ backgroundColor: comparing && !metrics ? undefined : chartPalette.f1 }"
+          ></i>
           {{ comparing ? (metrics ? '待检测 F1' : '待检测样本') : '场景 F1' }}
         </div>
-        <div class="metric-number amber">
+        <div
+          class="metric-number"
+          :style="{ color: comparing && !metrics ? undefined : chartPalette.f1 }"
+        >
           {{ comparing && !metrics ? result.currentRows?.toLocaleString() : number(metrics?.f1) }}
-          <span v-if="current.f1Drop !== null">
-            {{ current.f1Drop > 0 ? '−' : '+' }}{{ Math.abs(current.f1Drop * 100).toFixed(1) }}pp
+          <span
+            v-if="current.f1Drop !== null"
+            :style="{ color: current.impacted ? 'var(--red)' : undefined }"
+          >
+            {{ signedPoints(-current.f1Drop) }}
           </span>
         </div>
         <p class="metric-caption">
-          {{
-            current.impacted === null
-              ? '无法确认性能影响'
-              : current.impacted
-                ? '达到性能影响标准'
-                : '未达到影响标准'
-          }}
+          {{ f1Status(current.f1Drop, current.impacted) }}
         </p>
       </div>
       <div class="metric">
         <div class="metric-label">
-          <i class="metric-dot" style="background: #6b92d3"></i>
+          <i class="metric-dot" :style="{ backgroundColor: chartPalette.psi }"></i>
           最大 PSI
         </div>
-        <div class="metric-number blue">{{ number(current.maxPsi, 2) }}</div>
+        <div class="metric-number" :style="{ color: chartPalette.psi }">
+          {{ number(current.maxPsi, 2) }}
+        </div>
         <p class="metric-caption">
           {{
             current.maxPsi >= rule.critical
@@ -336,10 +456,12 @@ function inspect(name: string) {
       </div>
       <div class="metric">
         <div class="metric-label">
-          <i class="metric-dot" style="background: #d8b05c"></i>
+          <i class="metric-dot" :style="{ backgroundColor: chartPalette.threshold }"></i>
           PSI 预警阈值
         </div>
-        <div class="metric-number amber">{{ number(rule.warning, 2) }}</div>
+        <div class="metric-number" :style="{ color: chartPalette.threshold }">
+          {{ number(rule.warning, 2) }}
+        </div>
         <p class="metric-caption">{{ changed }} / {{ current.fields.length }} 个字段需关注</p>
       </div>
     </div>
@@ -403,20 +525,10 @@ function inspect(name: string) {
                 <button class="link-button" @click.stop="inspect(f.name)">{{ f.name }}</button>
               </td>
               <td>
-                <div class="table-bar">
+                <div class="table-bar" :class="f.risk">
                   <small class="mono">{{ number(f.psi) }}</small>
-                  <span>
-                    <i
-                      :style="{
-                        width: Math.min(100, (f.psi / rule.critical) * 100) + '%',
-                        background:
-                          f.risk === 'stable'
-                            ? '#82baa2'
-                            : f.risk === 'critical'
-                              ? '#d68b7d'
-                              : '#d7b76b',
-                      }"
-                    ></i>
+                  <span aria-hidden="true">
+                    <i :style="{ width: Math.min(100, (f.psi / rule.critical) * 100) + '%' }"></i>
                   </span>
                 </div>
               </td>
@@ -453,8 +565,8 @@ function inspect(name: string) {
               <th class="num">最大 PSI</th>
               <th class="num">F1</th>
               <th class="num">Recall</th>
-              <th class="num">F1 下降</th>
-              <th>实际影响</th>
+              <th class="num">F1 变化</th>
+              <th>F1 判定</th>
             </tr>
           </thead>
           <tbody>
@@ -470,18 +582,30 @@ function inspect(name: string) {
               <td>
                 <button class="link-button" @click="selectedId = s.id">{{ s.name }}</button>
               </td>
-              <td class="num mono">{{ number(s.maxPsi) }}</td>
-              <td class="num mono">{{ number(s.evaluation?.metrics?.f1) }}</td>
-              <td class="num mono">{{ number(s.evaluation?.metrics?.recall) }}</td>
+              <td class="num mono" :style="{ color: chartPalette.psi }">{{ number(s.maxPsi) }}</td>
+              <td class="num mono" :style="{ color: chartPalette.f1 }">
+                {{ number(s.evaluation?.metrics?.f1) }}
+              </td>
+              <td class="num mono" :style="{ color: chartPalette.recall }">
+                {{ number(s.evaluation?.metrics?.recall) }}
+              </td>
               <td class="num" :class="{ 'text-danger': s.impacted }">
-                {{ s.f1Drop === null ? '—' : (s.f1Drop * 100).toFixed(1) + 'pp' }}
+                {{ s.f1Drop === null ? '—' : signedPoints(-s.f1Drop) }}
               </td>
               <td>
                 <span
                   class="tag"
-                  :class="s.impacted === null ? 'gray' : s.impacted ? 'red' : 'green'"
+                  :class="
+                    s.f1Drop === null
+                      ? 'gray'
+                      : s.impacted
+                        ? 'red'
+                        : -s.f1Drop >= rule.impact
+                          ? 'amber'
+                          : 'green'
+                  "
                 >
-                  {{ s.impacted === null ? '无法确认' : s.impacted ? '达到标准' : '未达标准' }}
+                  {{ f1Status(s.f1Drop, s.impacted) }}
                 </span>
               </td>
             </tr>
@@ -498,7 +622,8 @@ function inspect(name: string) {
               <h4>01 · 数据漂移 {{ changed ? '已检测到' : '未超过当前规则' }}</h4>
               <p>
                 {{ changed }} 个字段触发规则；最大 PSI
-                {{ number(current.maxPsi) }}。统计检验显著表示分布有变化，不等于模型失效。
+                <span :style="{ color: chartPalette.psi }">{{ number(current.maxPsi) }}</span>
+                。统计检验显著表示分布有变化，不等于模型失效。
               </p>
             </div>
             <div class="verdict" :class="predictionChanged ? '' : 'green'">
@@ -518,35 +643,51 @@ function inspect(name: string) {
                 {{ percent(rule.prediction_change) }}。
               </p>
               <p v-else>当前实验仅分析数据分布，未调用模型。</p>
+              <p
+                v-if="baselineRates.actualPositive !== null || currentRates.actualPositive !== null"
+              >
+                实际正类比例 {{ percent(baselineRates.actualPositive) }} →
+                {{ percent(currentRates.actualPositive) }}
+                <template
+                  v-if="
+                    baselineRates.actualPositive !== null && currentRates.actualPositive !== null
+                  "
+                >
+                  （{{ signedPoints(currentRates.actualPositive - baselineRates.actualPositive) }}）
+                </template>
+              </p>
             </div>
             <div
               class="verdict"
-              :class="current.impacted === null ? 'blue' : current.impacted ? 'red' : 'green'"
+              :class="
+                current.f1Drop === null
+                  ? 'blue'
+                  : current.impacted
+                    ? 'red'
+                    : -current.f1Drop >= rule.impact
+                      ? ''
+                      : 'green'
+              "
             >
               <h4>
                 03 · 性能变化
-                {{
-                  current.impacted === null
-                    ? '无法确认'
-                    : current.impacted
-                      ? '达到影响标准'
-                      : '未达到影响标准'
-                }}
+                {{ f1Status(current.f1Drop, current.impacted) }}
               </h4>
               <p v-if="current.f1Drop !== null">
-                F1 下降 {{ (current.f1Drop * 100).toFixed(2) }}pp，影响标准为
-                {{ (rule.impact * 100).toFixed(1) }}pp。{{
+                <span :class="{ 'text-danger': current.impacted }">
+                  {{
+                    current.f1Drop === 0
+                      ? 'F1 持平'
+                      : `F1 ${current.f1Drop > 0 ? '下降' : '上升'} ${Math.abs(current.f1Drop * 100).toFixed(2)} 个百分点`
+                  }}
+                </span>
+                ，变化阈值为 {{ (rule.impact * 100).toFixed(1) }} 个百分点。{{
                   comparing
                     ? '这是两批已标注数据的性能差异，不能单独认定由漂移导致。'
                     : '此结论只针对本次保留标签的受控场景。'
                 }}
               </p>
-              <p v-else>
-                {{
-                  current.evaluation?.reason ||
-                  '需要可用模型和有效真实标签，才能计算 F1、Recall、AUC。'
-                }}
-              </p>
+              <p v-else>两批数据都需要有可用的模型评估结果，才能比较 F1。</p>
             </div>
           </div>
         </section>
@@ -572,10 +713,21 @@ function inspect(name: string) {
                   }[key]
                 }}
               </span>
-              <strong class="mono">
+              <strong class="mono" :style="{ color: modelMetricColors[key] }">
                 {{ number(baseline?.metrics?.[key]) }}
                 <span class="muted">→</span>
                 {{ number(metrics?.[key]) }}
+              </strong>
+            </div>
+            <div v-for="rate in errorRates" :key="rate.key" class="kv">
+              <span class="flex">
+                {{ rate.label }}
+                <HelpTip :label="rate.label" :text="rate.detail" />
+              </span>
+              <strong class="mono" :style="{ color: rate.color }">
+                {{ percent(baselineRates[rate.key]) }}
+                <span class="muted">→</span>
+                {{ percent(currentRates[rate.key]) }}
               </strong>
             </div>
             <div class="info-strip blue mt-16">
@@ -653,14 +805,14 @@ function inspect(name: string) {
       wide
       @close="showField = false"
     >
-      <div class="grid four mb-20">
-        <div class="report-stat">
+      <div class="grid four mb-20 field-distribution-stats">
+        <div class="report-stat" :class="field.risk">
           <strong>{{ number(field.psi) }}</strong>
           <small>PSI</small>
         </div>
         <div class="report-stat">
-          <strong>{{ field.method === 'ks' ? 'KS' : 'χ²' }}</strong>
-          <small>{{ number(field.statistic) }}</small>
+          <strong>{{ number(field.statistic) }}</strong>
+          <small>{{ field.method === 'ks' ? 'KS 统计量' : 'χ² 统计量' }}</small>
         </div>
         <div class="report-stat">
           <strong>
@@ -673,7 +825,23 @@ function inspect(name: string) {
           <small>{{ comparing ? '待检测缺失率' : '场景缺失率' }}</small>
         </div>
       </div>
+      <div class="distribution-legend" role="group" aria-label="选择要显示的分布">
+        <button
+          v-for="series in distributionSeries"
+          :key="series.key"
+          type="button"
+          class="btn sm"
+          :aria-pressed="visibleDistribution[series.key]"
+          aria-controls="field-distribution-chart"
+          @click="visibleDistribution[series.key] = !visibleDistribution[series.key]"
+        >
+          <span class="distribution-swatch" :style="{ backgroundColor: series.color }"></span>
+          {{ series.label }}
+          <Icon :name="visibleDistribution[series.key] ? 'eye' : 'eye-off'" :size="13" />
+        </button>
+      </div>
       <Chart
+        id="field-distribution-chart"
         :config="distChart"
         :label="field.name + (comparing ? '基准和待检测分布柱状图' : '基准和场景分布柱状图')"
         :height="300"

@@ -78,6 +78,10 @@ class AdapterRequest(BaseModel):
     consent: bool = False
 
 
+DatasetRole = Literal['reference', 'current']
+
+
 class DatasetUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
     label: str | None = None
+    role: DatasetRole | None = None

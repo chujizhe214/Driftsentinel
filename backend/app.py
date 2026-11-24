@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from . import storage as db
 from .analytics import read_csv, profile, load_predictor, evaluate, run_experiment, run_comparison, comparison_frames
-from .schemas import RunRequest, AdapterRequest, DatasetUpdate, Rules
+from .schemas import RunRequest, AdapterRequest, DatasetRole, DatasetUpdate, Rules
 
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='experiment')
 cancellations: dict[str, threading.Event] = {}
@@ -32,11 +32,11 @@ def dataframe(dataset):
     return pd.read_pickle(db.DATA_DIR / 'datasets' / f'{dataset["id"]}.pkl')
 
 
-def add_dataset(frame, name, source, key=None, label=None):
+def add_dataset(frame, name, source, key=None, label=None, role=None):
     key = key or db.uid('data')
     frame.to_pickle(db.DATA_DIR / 'datasets' / f'{key}.pkl')
     info = profile(frame)
-    return db.put('datasets', {'id':key, 'name':name, 'source':source, 'label':label,
+    return db.put('datasets', {'id':key, 'name':name, 'source':source, 'label':label, 'role':role,
                               'createdAt':db.now(), 'profile':info})
 
 
@@ -45,8 +45,12 @@ def bootstrap():
     if not (demo_dir / 'model.json').exists():
         raise RuntimeError('缺少示例数据，请运行 python scripts/prepare_demo.py')
     info = json.loads((demo_dir / 'model.json').read_text(encoding='utf-8'))
-    if not db.get('datasets', 'bank-reference'):
-        add_dataset(pd.read_csv(demo_dir / 'bank_reference.csv'), 'Bank Marketing · reference', 'UCI Bank Marketing', 'bank-reference', 'y')
+    demo_dataset = db.get('datasets', 'bank-reference')
+    if not demo_dataset:
+        add_dataset(pd.read_csv(demo_dir / 'bank_reference.csv'), 'Bank Marketing · reference', 'UCI Bank Marketing', 'bank-reference', 'y', 'reference')
+    elif demo_dataset.get('role') != 'reference':
+        demo_dataset['role'] = 'reference'
+        db.put('datasets', demo_dataset)
     existing_model=db.get('models', info['id'])
     if not existing_model:
         db.put('models', {'id':info['id'], 'name':info['name'], 'version':info['version'], 'kind':'builtin',
@@ -88,13 +92,14 @@ def datasets():
 
 
 @app.post('/api/datasets')
-async def upload_dataset(file: UploadFile=File(...)):
+async def upload_dataset(file: UploadFile=File(...), role: DatasetRole | None=None):
     if not file.filename or not file.filename.lower().endswith('.csv'):
         raise HTTPException(422,'仅支持 .csv 文件')
     content=await file.read(30*1024*1024+1)
     frame=await asyncio.to_thread(read_csv,content)
     candidates=profile(frame)['labelCandidates']
-    return await asyncio.to_thread(add_dataset,frame,Path(file.filename).stem,'本地导入',None,candidates[-1] if candidates else None)
+    return await asyncio.to_thread(add_dataset,frame,Path(file.filename).stem,'本地导入',
+                                   label=candidates[-1] if candidates else None,role=role)
 
 
 @app.patch('/api/datasets/{key}')
@@ -102,7 +107,12 @@ def update_dataset(key: str, payload: DatasetUpdate):
     item=require('datasets',key)
     if payload.label and payload.label not in [f['name'] for f in item['profile']['fields']]:
         raise HTTPException(422,'标签列不存在')
-    item.update(name=payload.name,label=payload.label)
+    changes = payload.model_dump(exclude_unset=True)
+    if key == 'bank-reference' and 'role' in changes and payload.role != 'reference':
+        raise HTTPException(422, '内置示例固定用作基准数据')
+    if payload.name is None:
+        changes.pop('name', None)
+    item.update(changes)
     return db.put('datasets',item)
 
 

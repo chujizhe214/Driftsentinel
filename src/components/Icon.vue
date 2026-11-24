@@ -48,6 +48,8 @@ import {
   BookOpen,
   Code,
   Eye,
+  EyeOff,
+  Pencil,
   RefreshCw,
   ArrowLeft,
 } from 'lucide-vue-next'
@@ -100,6 +102,8 @@ const icons: Record<string, unknown> = {
   book: BookOpen,
   code: Code,
   eye: Eye,
+  'eye-off': EyeOff,
+  pencil: Pencil,
   refresh: RefreshCw,
   back: ArrowLeft,
 }

@@ -372,11 +372,12 @@ def predict(X):
   margin-top: 12px;
   border: 1px solid var(--line);
   border-radius: 7px;
+  background: var(--raised);
   cursor: pointer;
 }
 .template-option.selected {
   border-color: var(--primary);
-  background: #f3faf7;
+  background: var(--primary-soft);
 }
 .template-option input {
   margin-top: 4px;
@@ -393,7 +394,7 @@ def predict(X):
 }
 .template-option small {
   margin: 7px 0;
-  color: #718879;
+  color: var(--muted);
   line-height: 1.7;
 }
 .template-option code {

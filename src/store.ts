@@ -1,6 +1,6 @@
 import { computed, reactive, watch } from 'vue'
 import { api, post } from './api'
-import type { Dataset, Model, Rules, Experiment, Scenario, RunRequest } from './types'
+import type { Dataset, DatasetRole, Model, Rules, Experiment, Scenario, RunRequest } from './types'
 
 const defaults: Rules = {
   warning: 0.2,
@@ -28,7 +28,7 @@ export const store = reactive({
   models: [] as Model[],
   experiments: [] as Experiment[],
   rules: { ...defaults },
-  activeDatasetId: previous.activeDatasetId || 'bank-reference',
+  activeDatasetId: previous.activeDatasetId ?? 'bank-reference',
   mode: (previous.mode === 'compare' ? 'compare' : 'stress') as 'stress' | 'compare',
   currentDatasetId: (previous.currentDatasetId || '') as string,
   currentLabel: (previous.currentLabel || null) as string | null,
@@ -49,6 +49,32 @@ export const store = reactive({
   toasts: [] as { id: number; text: string; error: boolean }[],
   health: null as { version: string; storage: string; mode: string } | null,
 })
+const previousDatasetRoles = computed(() => {
+  const roles = new Map<string, DatasetRole>()
+  if (store.activeDatasetId) roles.set(store.activeDatasetId, 'reference')
+  if (store.currentDatasetId && !roles.has(store.currentDatasetId)) {
+    roles.set(store.currentDatasetId, 'current')
+  }
+  for (const { status, request } of store.experiments) {
+    if (status !== 'completed') continue
+    if (!roles.has(request.dataset_id)) roles.set(request.dataset_id, 'reference')
+    const currentId = request.current_dataset_id
+    if (request.mode === 'compare' && currentId && !roles.has(currentId)) {
+      roles.set(currentId, 'current')
+    }
+  }
+  return roles
+})
+export function datasetRole(item: Dataset) {
+  if (item.id === 'bank-reference') return 'reference'
+  return item.role ?? previousDatasetRoles.value.get(item.id)
+}
+export const referenceDatasets = computed(() =>
+  store.datasets.filter((item) => datasetRole(item) === 'reference'),
+)
+export const actualDatasets = computed(() =>
+  store.datasets.filter((item) => datasetRole(item) === 'current'),
+)
 export const dataset = computed(() => store.datasets.find((d) => d.id === store.activeDatasetId))
 export const currentDataset = computed(() =>
   store.datasets.find((d) => d.id === store.currentDatasetId),
@@ -173,6 +199,7 @@ export function resetScenarios() {
 }
 export function selectDataset(id: string) {
   store.activeDatasetId = id
+  if (id && id === store.currentDatasetId) selectCurrentDataset('')
   store.samples = dataset.value?.profile.rows || 1000
   resetScenarios()
   if (!compatible.value) store.activeModelId = null
@@ -199,7 +226,7 @@ export async function loadDemo() {
     try {
       const updated = await api<Dataset>(`/datasets/${demo.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name: demo.name, label: 'y' }),
+        body: JSON.stringify({ label: 'y' }),
       })
       store.datasets = store.datasets.map((d) => (d.id === updated.id ? updated : d))
     } catch (e) {
@@ -209,6 +236,7 @@ export async function loadDemo() {
   }
   store.mode = 'stress'
   store.activeDatasetId = 'bank-reference'
+  if (store.currentDatasetId === 'bank-reference') selectCurrentDataset('')
   store.activeModelId = 'bank-logistic-v1'
   store.seed = 42
   store.samples = dataset.value?.profile.rows || 1357
@@ -234,8 +262,15 @@ export async function initialize() {
     store.experiments = es
     store.rules = rules
     store.health = health
-    if (!dataset.value) selectDataset(ds[0]?.id || '')
-    if (!currentDataset.value) selectCurrentDataset('')
+    if (
+      store.activeDatasetId &&
+      !referenceDatasets.value.some((d) => d.id === store.activeDatasetId)
+    ) {
+      selectDataset(referenceDatasets.value[0]?.id || '')
+    }
+    if (!actualDatasets.value.some((d) => d.id === store.currentDatasetId)) {
+      selectCurrentDataset('')
+    }
     if (!store.scenarios.length) resetScenarios()
     const active = es.find((e) => e.status === 'running' || e.status === 'queued')
     const current = active?.id || (es.some((e) => e.id === store.currentId) ? store.currentId : '')
@@ -299,6 +334,7 @@ export async function run(overrides?: Partial<RunRequest>) {
     rules: store.rules,
   }
   if (overrides?.dataset_id) Object.assign(payload, overrides)
+  store.progress = 0
   store.running = true
   try {
     const item = await post<Experiment>('/experiments', payload)

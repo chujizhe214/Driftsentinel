@@ -13,11 +13,13 @@ export interface Feature {
   q75?: number
   categories?: { name: string; count: number; share: number }[]
 }
+export type DatasetRole = 'reference' | 'current'
 export interface Dataset {
   id: string
   name: string
   source: string
   label: string | null
+  role?: DatasetRole | null
   createdAt: string
   profile: {
     rows: number

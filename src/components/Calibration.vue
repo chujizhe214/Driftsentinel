@@ -4,6 +4,7 @@ import type { ChartConfiguration } from 'chart.js'
 import type { Experiment } from '../types'
 import { store, saveRules, notify } from '../store'
 import { number, percent } from '../api'
+import { chartPalette } from '../chartPalette'
 import Icon from './Icon.vue'
 import Chart from './Chart.vue'
 const props = defineProps<{ experiment: Experiment }>()
@@ -24,7 +25,7 @@ const config = computed<ChartConfiguration>(() => ({
       {
         label: '检测召回',
         data: current.value?.rows.map((r) => r.recall) || [],
-        borderColor: '#399b7e',
+        borderColor: chartPalette.recall,
         borderWidth: 2,
         pointRadius: 3,
         tension: 0.2,
@@ -32,7 +33,8 @@ const config = computed<ChartConfiguration>(() => ({
       {
         label: '误报率',
         data: current.value?.rows.map((r) => r.falseAlarm) || [],
-        borderColor: '#cc8878',
+        borderColor: chartPalette.falseAlarm,
+        borderDash: [6, 4],
         borderWidth: 2,
         pointRadius: 3,
         tension: 0.2,
@@ -40,7 +42,8 @@ const config = computed<ChartConfiguration>(() => ({
       {
         label: '漏报率',
         data: current.value?.rows.map((r) => r.missRate) || [],
-        borderColor: '#d8b363',
+        borderColor: chartPalette.missRate,
+        borderDash: [2, 4],
         borderWidth: 2,
         pointRadius: 3,
         tension: 0.2,
@@ -60,17 +63,17 @@ const config = computed<ChartConfiguration>(() => ({
           boxWidth: 5,
           boxHeight: 5,
           font: { size: 10 },
-          color: '#91a597',
+          color: chartPalette.lineText,
         },
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#91a597' } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: chartPalette.lineText } },
       y: {
         min: 0,
         max: 1,
-        grid: { color: '#eff3f0' },
-        ticks: { font: { size: 10 }, color: '#91a597' },
+        grid: { color: chartPalette.lineGrid },
+        ticks: { font: { size: 10 }, color: chartPalette.lineText },
       },
     },
   },
@@ -159,18 +162,24 @@ async function apply() {
             <div class="grid three mt-16">
               <div>
                 <p class="small muted">检测召回</p>
-                <strong class="text-primary">{{ percent(current.best.recall) }}</strong>
+                <strong :style="{ color: chartPalette.recall }">
+                  {{ percent(current.best.recall) }}
+                </strong>
               </div>
               <div>
                 <p class="small muted">误报率</p>
-                <strong class="text-amber">{{ percent(current.best.falseAlarm) }}</strong>
+                <strong :style="{ color: chartPalette.falseAlarm }">
+                  {{ percent(current.best.falseAlarm) }}
+                </strong>
               </div>
               <div>
                 <p class="small muted">漏报率</p>
-                <strong class="text-danger">{{ percent(current.best.missRate) }}</strong>
+                <strong :style="{ color: chartPalette.missRate }">
+                  {{ percent(current.best.missRate) }}
+                </strong>
               </div>
             </div>
-            <button class="btn primary full mt-20" :disabled="busy" @click="apply">
+            <button class="btn success full mt-20" :disabled="busy" @click="apply">
               <Icon name="check" />
               采用推荐阈值
             </button>
@@ -216,10 +225,16 @@ async function apply() {
                 <td class="num">{{ r.fp }}</td>
                 <td class="num">{{ r.fn }}</td>
                 <td class="num">{{ r.tn }}</td>
-                <td class="num">{{ percent(r.recall, 0) }}</td>
+                <td class="num" :style="{ color: chartPalette.recall }">
+                  {{ percent(r.recall, 0) }}
+                </td>
                 <td class="num">{{ percent(r.precision, 0) }}</td>
-                <td class="num">{{ percent(r.falseAlarm, 0) }}</td>
-                <td class="num">{{ percent(r.missRate, 0) }}</td>
+                <td class="num" :style="{ color: chartPalette.falseAlarm }">
+                  {{ percent(r.falseAlarm, 0) }}
+                </td>
+                <td class="num" :style="{ color: chartPalette.missRate }">
+                  {{ percent(r.missRate, 0) }}
+                </td>
                 <td>
                   <span v-if="r.threshold === current.best?.threshold" class="tag green">推荐</span>
                 </td>

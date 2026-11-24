@@ -41,12 +41,7 @@ npm run build
 .\.venv\Scripts\python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 
-开发模式使用两个终端，业务服务仍在 8000 端口：
-
-```powershell
-python -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
-npm run dev
-```
+开发模式下，双击 `dev-backend.bat` 启动本地后端，保存 `backend/` 下的 Python 文件后会自动重载。如果项目的 Docker 容器正在运行，先双击 `stop.bat` 释放 8000 端口。另开一个终端在项目目录运行 `npm run dev` 启动前端。
 
 前端开发地址为 http://127.0.0.1:5173，`/api` 由 Vite 代理到 Python 服务。生产构建由同一个 FastAPI 服务提供，无需额外 Web 服务器。API 文档：http://127.0.0.1:8000/docs。
 

@@ -8,13 +8,17 @@ test('完整实验：配置、计算、分布、校准、报告、历史与复�
   await page.goto('/')
   await expect(page.getByRole('heading', { name: '漂移压力测试', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '加载示例' }).click()
+  await page.getByRole('button', { name: '配置漂移场景', exact: true }).click()
   await expect(page.getByRole('switch')).toHaveCount(5)
   await page.getByRole('switch', { name: '极端值注入', exact: true }).click()
   await page.getByRole('checkbox', { name: /增加多字段组合压力场景/ }).check()
+  await page.getByRole('button', { name: '完成配置', exact: true }).click()
+  await expect(page.locator('.workflow-run-stats')).toContainText('17')
   await page.getByRole('button', { name: '运行压力测试', exact: true }).click()
   await expect(page.getByText('实验已完成，结果已保存到本机')).toBeVisible({ timeout: 45000 })
+  await expect(page.locator('#result-scenario')).toHaveCount(0)
+  await page.getByRole('button', { name: '查看已保存结果', exact: true }).click()
   await expect(page.locator('#result-scenario option')).toHaveCount(17)
-  await page.getByRole('button', { name: '结果分析' }).click()
   await expect(page.getByRole('heading', { name: '分层结论' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '混淆矩阵', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'duration', exact: true }).first().click()
@@ -47,27 +51,39 @@ test('标签与模型输入冲突时阻止运行，修正或加载示例后可�
   await page.getByRole('button', { name: '加载示例', exact: true }).click()
   const label = page.locator('#label-select')
   const run = page.getByRole('button', { name: '运行压力测试', exact: true })
+  const baseline = page.getByRole('button', { name: '配置基准数据', exact: true })
+  const finish = page.getByRole('button', { name: '完成配置', exact: true })
+  await baseline.click()
   await expect(label).toHaveValue('y')
   await label.selectOption('job')
   await expect(page.getByRole('alert')).toContainText('“job”是内置模型所需的输入特征')
+  await finish.click()
   await expect(run).toBeDisabled()
   await page.reload()
-  await expect(label).toHaveValue('job')
   await expect(run).toBeDisabled()
-  await page.getByRole('button', { name: '改用示例标签 y', exact: true }).click()
+  await baseline.click()
+  await expect(label).toHaveValue('job')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '改用示例标签 y', exact: true })
+    .click()
   await expect(label).toHaveValue('y')
+  await finish.click()
   await expect(run).toBeEnabled()
   await expect(page.getByRole('alert')).toHaveCount(0)
+  await baseline.click()
   await label.selectOption('job')
+  await expect(page.getByRole('alert')).toContainText('“job”是内置模型所需的输入特征')
+  await finish.click()
   await expect(run).toBeDisabled()
   await page.getByRole('button', { name: '加载示例', exact: true }).click()
-  await expect(label).toHaveValue('y')
   await expect(run).toBeEnabled()
   await expect
     .poll(async () => (await (await page.request.get('/api/datasets')).json())[0].label)
     .toBe('y')
   await run.click()
   await expect(page.getByText('实验已完成，结果已保存到本机')).toBeVisible({ timeout: 45000 })
+  await page.getByRole('button', { name: '查看已保存结果', exact: true }).click()
   await expect(page.locator('#result-scenario option')).toHaveCount(13)
 })
 
@@ -84,7 +100,9 @@ test('CSV 导入、字段画像、仅数据实验和无标签边界', async ({ p
   await page.locator('#dataset-label').selectOption('')
   await page.getByRole('button', { name: '保存设置' }).click()
   await page.getByRole('link', { name: '实验工作台', exact: true }).click()
+  await page.getByRole('button', { name: '配置模型适配器', exact: true }).click()
   await expect(page.locator('#model-select option:checked')).toHaveText('仅分析数据漂移')
+  await page.getByRole('button', { name: '完成配置', exact: true }).click()
   await page.getByRole('button', { name: '运行压力测试', exact: true }).click()
   await expect(page.getByText('实验已完成，结果已保存到本机')).toBeVisible({ timeout: 45000 })
   await page.getByRole('button', { name: '结果分析' }).click()
@@ -191,6 +209,18 @@ test('固定基准对比每日实际 CSV，无模型无标签、字段校验、�
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto('/')
   await page.getByRole('button', { name: '实际数据对比', exact: true }).click()
+  const baseline = page.getByRole('button', { name: '配置基准数据', exact: true })
+  const configureObserved = page.getByRole('button', { name: '配置待检测数据', exact: true })
+  const finish = page.getByRole('button', { name: '完成配置', exact: true })
+  const config = page.getByRole('button', { name: /检测配置/ })
+  const run = page.getByRole('button', { name: '运行实际检测', exact: true })
+  const savedResult = page.getByRole('button', { name: '查看已保存结果', exact: true })
+  await expect(page.locator('.workflow-node-label')).toHaveText([
+    '基准数据',
+    '待检测数据',
+    '模型适配器',
+  ])
+  await baseline.click()
   const reference =
     'value,group\n' +
     Array.from({ length: 60 }, (_, i) => `${i},${['a', 'b', 'c'][i % 3]}`).join('\n')
@@ -202,7 +232,11 @@ test('固定基准对比每日实际 CSV，无模型无标签、字段校验、�
   await expect(page.locator('#dataset-select option:checked')).toHaveText('daily-reference')
   await page.locator('#label-select').selectOption('')
   const referenceId = await page.locator('#dataset-select').inputValue()
+  await finish.click()
+  await page.getByRole('button', { name: '配置模型适配器', exact: true }).click()
   await expect(page.locator('#model-select option:checked')).toHaveText('仅分析数据漂移')
+  await finish.click()
+  await configureObserved.click()
   await expect(page.getByRole('switch')).toHaveCount(0)
   const observed =
     'group,value,extra\n' + Array.from({ length: 90 }, (_, i) => `c,${1000 + i},today`).join('\n')
@@ -214,12 +248,16 @@ test('固定基准对比每日实际 CSV，无模型无标签、字段校验、�
   await expect(page.locator('#current-dataset-select option:checked')).toContainText(
     'observed-today',
   )
-  await expect(page.locator('#dataset-select')).toHaveValue(referenceId)
   await expect(page.locator('#current-label-select option:checked')).toHaveText(
     '无 · 尚未获得真实结果',
   )
   await page.locator('#comparison-name').fill('每日真实数据检测')
-  await page.getByRole('button', { name: '运行实际检测', exact: true }).first().click()
+  await finish.click()
+  await expect(page.locator('.workflow-run-stats')).toContainText('90')
+  await run.click()
+  await expect(page.getByText('实验已完成，结果已保存到本机')).toBeVisible({ timeout: 45000 })
+  await expect(page.locator('.comparison-identity')).toHaveCount(0)
+  await savedResult.click()
   await expect(page.locator('.comparison-identity')).toContainText('待检测：observed-today', {
     timeout: 45000,
   })
@@ -227,7 +265,6 @@ test('固定基准对比每日实际 CSV，无模型无标签、字段校验、�
   await expect(page.locator('.comparison-identity')).toContainText('90 行')
   await expect(page.getByRole('heading', { name: '实际数据字段漂移' })).toBeVisible()
   await expect(page.getByText('待检测数据的额外字段未参与对比：extra')).toBeVisible()
-  await page.getByRole('button', { name: '结果分析', exact: false }).first().click()
   await page.getByRole('button', { name: 'value', exact: true }).first().click()
   await expect(page.getByRole('img', { name: 'value基准和待检测分布柱状图' })).toBeVisible()
   await page.getByRole('button', { name: '关闭对话框' }).click()
@@ -242,23 +279,33 @@ test('固定基准对比每日实际 CSV，无模型无标签、字段校验、�
   await expect(row).toContainText('daily-reference')
   await expect(row).toContainText('observed-today')
   await row.getByRole('button', { name: '复现实验', exact: true }).click()
+  await expect(page.getByText('实验已完成，结果已保存到本机')).toBeVisible({ timeout: 45000 })
+  await savedResult.click()
   await expect(page.locator('.comparison-identity')).toContainText('observed-today', {
     timeout: 45000,
   })
   await page.reload()
+  await config.click()
+  await baseline.click()
   await expect(page.locator('#dataset-select')).toHaveValue(referenceId)
+  await finish.click()
+  await savedResult.click()
   await expect(page.locator('.comparison-identity')).toContainText('observed-today')
   // Invalid current columns never change the fixed reference or enable a run.
+  await config.click()
+  await configureObserved.click()
   const invalid = reference.replace('value,group', 'wrong,group')
   await page.getByLabel('导入待检测 CSV', { exact: true }).setInputFiles({
     name: 'missing-field.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(invalid),
   })
-  await expect(page.getByText('待检测数据缺少基准特征字段：value', { exact: true })).toBeVisible()
   await expect(
-    page.getByRole('button', { name: '运行实际检测', exact: true }).first(),
-  ).toBeDisabled()
+    page.getByRole('dialog').getByText('待检测数据缺少基准特征字段：value', { exact: true }),
+  ).toBeVisible()
+  await finish.click()
+  await expect(run).toBeDisabled()
+  await configureObserved.click()
   await page.getByLabel('导入待检测 CSV', { exact: true }).setInputFiles({
     name: 'observed-tomorrow.csv',
     mimeType: 'text/csv',
@@ -267,9 +314,14 @@ test('固定基准对比每日实际 CSV，无模型无标签、字段校验、�
   await expect(page.locator('#current-dataset-select option:checked')).toContainText(
     'observed-tomorrow',
   )
-  await expect(page.locator('#dataset-select')).toHaveValue(referenceId)
   await page.locator('#comparison-name').fill('次日真实数据检测')
-  await page.getByRole('button', { name: '运行实际检测', exact: true }).first().click()
+  await finish.click()
+  await baseline.click()
+  await expect(page.locator('#dataset-select')).toHaveValue(referenceId)
+  await finish.click()
+  await run.click()
+  await expect(page.getByText('实验已完成，结果已保存到本机')).toBeVisible({ timeout: 45000 })
+  await savedResult.click()
   await expect(page.locator('.comparison-identity')).toContainText('observed-tomorrow', {
     timeout: 45000,
   })

@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #7a998a;
+  color: var(--muted);
 }
 .help-tip-trigger > span {
   display: grid;
@@ -140,11 +140,11 @@ onBeforeUnmount(() => {
   display: block;
   width: min(280px, calc(100vw - 24px));
   padding: 10px 12px;
-  border: 1px solid #d3e6dc;
+  border: 1px solid var(--control-line);
   border-radius: 7px;
-  background: #fff;
-  box-shadow: 0 4px 18px #183d281a;
-  color: #4b6354;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  color: var(--ink);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.8;

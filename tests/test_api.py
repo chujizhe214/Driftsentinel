@@ -181,6 +181,23 @@ def test_builtin_model_path_recovers_when_workspace_moves(client):
     assert updated['createdAt']==model['createdAt']
 
 
+@pytest.mark.parametrize('old_role', [None, 'current'])
+def test_builtin_dataset_role_is_restored_and_protected(client, old_role):
+    from backend.app import bootstrap
+
+    dataset = storage.get('datasets', 'bank-reference')
+    assert dataset['role'] == 'reference'
+    dataset['role'] = old_role
+    storage.put('datasets', dataset)
+
+    bootstrap()
+
+    assert storage.get('datasets', dataset['id']) == {**dataset, 'role': 'reference'}
+    path = '/api/datasets/' + dataset['id']
+    assert client.patch(path, json={'role': 'current'}).status_code == 422
+    assert client.patch(path, json={'label': None}).json()['role'] == 'reference'
+
+
 def test_running_experiment_can_be_cancelled(client,monkeypatch):
     import importlib
     module=importlib.import_module('backend.app')

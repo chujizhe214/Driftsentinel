@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Experiment } from '../types'
-import { number, percent, download, date } from '../api'
+import { number, download, date } from '../api'
+import { chartPalette } from '../chartPalette'
 import { notify, store } from '../store'
 import Icon from './Icon.vue'
 const props = defineProps<{ experiment: Experiment }>()
@@ -64,7 +65,7 @@ async function copy() {
       <div class="panel-body">
         <div class="grid four mb-20">
           <div class="report-stat">
-            <strong>
+            <strong :style="{ color: comparing ? undefined : chartPalette.f1 }">
               {{
                 comparing
                   ? experiment.result!.rows.toLocaleString()
@@ -74,7 +75,7 @@ async function copy() {
             <small>{{ comparing ? '基准样本' : '基准 F1' }}</small>
           </div>
           <div class="report-stat">
-            <strong>
+            <strong :style="{ color: comparing ? undefined : chartPalette.auc }">
               {{
                 comparing
                   ? experiment.result!.currentRows?.toLocaleString()
@@ -84,14 +85,16 @@ async function copy() {
             <small>{{ comparing ? '待检测样本' : '基准 AUC' }}</small>
           </div>
           <div class="report-stat">
-            <strong>
+            <strong :style="{ color: comparing ? 'var(--amber)' : 'var(--red)' }">
               {{ comparing ? changed : affected.length }} /
               {{ comparing ? experiment.result!.fields : experiment.result!.scenarios.length - 1 }}
             </strong>
-            <small>{{ comparing ? '触发漂移规则的字段' : '达到性能影响标准的场景' }}</small>
+            <small>{{ comparing ? '触发漂移规则的字段' : '触发 F1 下降告警的场景' }}</small>
           </div>
           <div class="report-stat">
-            <strong>{{ experiment.result!.duration.toFixed(2) }}s</strong>
+            <strong :style="{ color: chartPalette.duration }">
+              {{ experiment.result!.duration.toFixed(2) }}s
+            </strong>
             <small>实验计算耗时</small>
           </div>
         </div>
@@ -101,7 +104,9 @@ async function copy() {
             基准 {{ experiment.datasetName }} → 待检测 {{ experiment.currentDatasetName }}，{{
               changed
             }}
-            个字段触发规则，最大 PSI {{ number(observed.maxPsi) }}。该结果不单独证明模型性能下降。
+            个字段触发规则，最大 PSI
+            <span :style="{ color: chartPalette.psi }">{{ number(observed.maxPsi) }}</span>
+            。该结果不单独证明模型性能下降。
           </p>
         </div>
         <div class="verdict" :class="worst ? 'red' : 'blue'">
@@ -115,12 +120,26 @@ async function copy() {
             }}
           </h4>
           <p v-if="worst">
-            {{ worst.name }}，F1 下降 {{ percent(worst.f1Drop) }}，最大 PSI
-            {{ number(worst.maxPsi) }}。优先关注 {{ worst.field }} 的数据质量与分布变化。
+            {{ worst.name }}，F1 下降
+            <span class="text-danger">{{ ((worst.f1Drop ?? 0) * 100).toFixed(2) }} 个百分点</span>
+            ，最大 PSI
+            <span :style="{ color: chartPalette.psi }">{{ number(worst.maxPsi) }}</span>
+            。优先关注 {{ worst.field }} 的数据质量与分布变化。
           </p>
           <p v-else-if="comparing && observed.f1Drop !== null">
-            待检测 F1 {{ number(observed.evaluation?.metrics?.f1) }}，相对基准变化
-            {{ (-observed.f1Drop * 100).toFixed(2) }}pp，未达到设定的 F1 下降标准。
+            待检测 F1
+            <span :style="{ color: chartPalette.f1 }">
+              {{ number(observed.evaluation?.metrics?.f1) }}
+            </span>
+            ，{{
+              observed.f1Drop === 0
+                ? '与基准持平'
+                : `比基准${observed.f1Drop < 0 ? '上升' : '下降'} ${Math.abs(observed.f1Drop * 100).toFixed(2)} 个百分点`
+            }}。{{
+              -observed.f1Drop >= experiment.request.rules.impact
+                ? 'F1 上升达到变化阈值。'
+                : 'F1 变化未达阈值。'
+            }}
           </p>
           <p v-else>
             {{

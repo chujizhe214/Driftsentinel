@@ -88,7 +88,7 @@ function reset() {
             :key="text"
             class="kv"
           >
-            <span style="color: #728f7b">{{ text }}</span>
+            <span class="muted">{{ text }}</span>
             <Icon name="check" class="text-primary" :size="14" />
           </div>
         </div>

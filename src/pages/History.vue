@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { store, openExperiment, refreshExperiments, notify, run } from '../store'
 import { api, date, download } from '../api'
+import { chartPalette } from '../chartPalette'
 import type { Experiment } from '../types'
 import Icon from '../components/Icon.vue'
 import Modal from '../components/Modal.vue'
@@ -132,7 +133,7 @@ async function remove() {
       <p class="metric-caption">所有计算在本机完成</p>
     </div>
   </div>
-  <div class="toolbar">
+  <div class="toolbar history-toolbar">
     <div class="form-field search-field">
       <div class="input-icon">
         <Icon name="search" :size="14" />
@@ -193,15 +194,20 @@ async function remove() {
               <span class="tag" :class="e.status">{{ labels[e.status] }}</span>
             </td>
             <td class="num">
-              {{
-                e.summary
-                  ? e.request.mode === 'compare'
-                    ? (e.summary.driftFields ?? 0) + ' 字段需关注'
-                    : e.summary.scenarios + ' 场景 / ' + e.summary.impacted + ' 影响'
-                  : '—'
-              }}
+              <template v-if="e.summary">
+                <span v-if="e.request.mode === 'compare'" class="text-amber">
+                  {{ e.summary.driftFields ?? 0 }} 字段需关注
+                </span>
+                <template v-else>
+                  {{ e.summary.scenarios }} 场景 /
+                  <span class="text-danger">{{ e.summary.impacted }} 影响</span>
+                </template>
+              </template>
+              <template v-else>—</template>
             </td>
-            <td class="num">{{ e.summary ? e.summary.duration.toFixed(2) + 's' : '—' }}</td>
+            <td class="num" :style="{ color: e.summary ? chartPalette.duration : undefined }">
+              {{ e.summary ? e.summary.duration.toFixed(2) + 's' : '—' }}
+            </td>
             <td class="small">{{ date(e.createdAt) }}</td>
             <td>
               <div class="flex">

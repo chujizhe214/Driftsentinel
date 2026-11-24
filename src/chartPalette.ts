@@ -1,0 +1,17 @@
+export const chartPalette = {
+  text: '#a5a6af',
+  grid: '#2b2b30',
+  lineText: '#aab8d8',
+  lineGrid: '#2a3041',
+  distributionBaseline: '#555555',
+  distributionScenario: '#00E5FF',
+  f1: '#58dfbb',
+  f1Fill: '#58dfbb16',
+  auc: '#bca7ed',
+  duration: '#9bb5d2',
+  psi: '#9ca7ff',
+  threshold: '#ffae74',
+  recall: '#5dd9f5',
+  falseAlarm: '#f4cb71',
+  missRate: '#ff849b',
+}

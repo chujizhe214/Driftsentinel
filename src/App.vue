@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import Icon from './components/Icon.vue'
 import { store, initialize, dataset } from './store'
@@ -12,6 +12,7 @@ const nav = [
   { path: '/datasets', icon: 'database', label: '数据集' },
   { path: '/rules', icon: 'bell', label: '监控规则' },
 ]
+const activeNavIndex = computed(() => Math.max(nav.findIndex((item) => route.path === item.path), 0))
 onMounted(initialize)
 </script>
 <template>
@@ -36,7 +37,14 @@ onMounted(initialize)
         <Icon name="chevron" :size="13" />
       </div>
       <p class="nav-caption">工作空间</p>
-      <nav aria-label="主导航">
+      <nav
+        class="sidebar-nav"
+        aria-label="主导航"
+        :style="{ '--nav-active-index': activeNavIndex }"
+      >
+        <span v-if="route.path !== '/settings'" class="nav-glider-track" aria-hidden="true">
+          <span class="nav-glider"></span>
+        </span>
         <RouterLink
           v-for="item in nav"
           :key="item.path"

@@ -1,8 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import type { Dataset } from '../types'
+import { computed, nextTick, ref, watch } from 'vue'
+import type { Dataset, DatasetRole } from '../types'
 import { api, number, percent, date, download } from '../api'
-import { store, dataset, selectDataset, selectCurrentDataset, notify } from '../store'
+import {
+  store,
+  dataset,
+  datasetRole,
+  referenceDatasets,
+  actualDatasets,
+  selectDataset,
+  selectCurrentDataset,
+  notify,
+} from '../store'
 import Icon from '../components/Icon.vue'
 import Modal from '../components/Modal.vue'
 const search = ref(''),
@@ -14,44 +23,89 @@ const fileInput = ref<HTMLInputElement>()
 const detailId = ref(''),
   editName = ref(''),
   editLabel = ref(''),
+  editRole = ref<DatasetRole | ''>(''),
   saving = ref(false)
+const roleSelect = ref<HTMLSelectElement>()
 const deleteId = ref('')
-const importRole = ref<'reference' | 'current'>('reference')
+const importRole = ref<DatasetRole>('reference')
+const assigning = ref('')
+const filters = [
+  { id: 'all', label: '全部数据集', icon: 'layers' },
+  { id: 'reference', label: '基准数据集', icon: 'database' },
+  { id: 'current', label: '实际数据集', icon: 'clock' },
+] as const
+const filter = ref<(typeof filters)[number]['id']>('all')
+const filterIndex = computed(() => filters.findIndex((item) => item.id === filter.value))
+const scopedDatasets = computed(() =>
+  filter.value === 'all'
+    ? store.datasets
+    : filter.value === 'reference'
+      ? referenceDatasets.value
+      : actualDatasets.value,
+)
+const query = computed(() => search.value.trim().toLowerCase())
 const filtered = computed(() =>
-  store.datasets.filter((d) => d.name.toLowerCase().includes(search.value.toLowerCase())),
+  scopedDatasets.value.filter((item) => item.name.toLowerCase().includes(query.value)),
 )
 const detail = computed(() => store.datasets.find((d) => d.id === detailId.value))
 function openImport() {
   importing.value = true
   importError.value = ''
-  importRole.value = store.mode === 'compare' ? 'current' : 'reference'
+  importRole.value =
+    filter.value === 'all' ? (store.mode === 'compare' ? 'current' : 'reference') : filter.value
 }
-function useDataset(id: string) {
-  selectDataset(id)
-  notify('已设为当前基准数据')
-}
-function useCurrentDataset(id: string) {
-  store.mode = 'compare'
-  selectCurrentDataset(id)
-  notify('已设为待检测数据，基准保持不变')
+async function useDataset(item: Dataset) {
+  const role = datasetRole(item)
+  if (!role) return
+  assigning.value = item.id
+  try {
+    if (item.role !== role) {
+      const updated = await api<Dataset>(`/datasets/${item.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      })
+      store.datasets = store.datasets.map((d) => (d.id === item.id ? updated : d))
+    }
+    if (role === 'reference') {
+      selectDataset(item.id)
+      notify('已设为当前基准数据')
+    } else {
+      store.mode = 'compare'
+      selectCurrentDataset(item.id)
+      notify('已选为本次待检测数据')
+    }
+  } catch (e) {
+    notify(String(e), true)
+  } finally {
+    assigning.value = ''
+  }
 }
 watch(detailId, () => {
-  editName.value = detail.value?.name || ''
-  editLabel.value = detail.value?.label || ''
+  const item = detail.value
+  editName.value = item?.name || ''
+  editLabel.value = item?.label || ''
+  editRole.value = item ? (datasetRole(item) ?? '') : ''
 })
+async function editDatasetRole(id: string) {
+  detailId.value = id
+  await nextTick()
+  roleSelect.value?.focus()
+}
 async function upload(file?: File) {
-  if (!file) return
+  if (!file || uploading.value) return
   uploading.value = true
   importError.value = ''
   const form = new FormData()
   form.append('file', file)
+  const role = importRole.value
   try {
-    const item = await api<Dataset>('/datasets', { method: 'POST', body: form })
+    const item = await api<Dataset>(`/datasets?role=${role}`, {
+      method: 'POST',
+      body: form,
+    })
     store.datasets.unshift(item)
-    if (importRole.value === 'current') {
-      store.mode = 'compare'
-      selectCurrentDataset(item.id)
-    } else selectDataset(item.id)
+    if (role === 'reference') selectDataset(item.id)
+    if (filter.value !== 'all') filter.value = role
     importing.value = false
     detailId.value = item.id
     notify(`已导入 ${item.profile.rows.toLocaleString()} 行数据`)
@@ -67,16 +121,26 @@ function drop(event: DragEvent) {
   upload(event.dataTransfer?.files[0])
 }
 async function save() {
-  if (!detail.value) return
+  const original = detail.value
+  if (!original || saving.value) return
+  const role = editRole.value || undefined
+  const roleChanged = role !== undefined && role !== datasetRole(original)
   saving.value = true
   try {
-    const item = await api<Dataset>(`/datasets/${detail.value.id}`, {
+    const item = await api<Dataset>(`/datasets/${original.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ name: editName.value, label: editLabel.value || null }),
+      body: JSON.stringify({ name: editName.value, label: editLabel.value || null, role }),
     })
     store.datasets = store.datasets.map((d) => (d.id === item.id ? item : d))
-    if (dataset.value?.id === item.id) selectDataset(item.id)
-    notify('数据集设置已保存')
+    if (roleChanged && role === 'reference' && store.currentDatasetId === item.id) {
+      selectCurrentDataset('')
+    }
+    if (dataset.value?.id === item.id) {
+      if (roleChanged && role === 'current') selectDataset('')
+      else if (original.label !== item.label) selectDataset(item.id)
+    }
+    if (roleChanged && filter.value !== 'all') filter.value = role
+    notify(roleChanged ? '数据集用途已修改' : '数据集设置已保存')
     detailId.value = ''
   } catch (e) {
     notify(String(e), true)
@@ -88,7 +152,8 @@ async function remove() {
   try {
     await api(`/datasets/${deleteId.value}`, { method: 'DELETE' })
     store.datasets = store.datasets.filter((d) => d.id !== deleteId.value)
-    if (store.activeDatasetId === deleteId.value) selectDataset('bank-reference')
+    if (store.activeDatasetId === deleteId.value)
+      selectDataset(referenceDatasets.value[0]?.id || '')
     if (store.currentDatasetId === deleteId.value) selectCurrentDataset('')
     deleteId.value = ''
     notify('数据集已删除，历史实验快照仍可查看')
@@ -109,34 +174,90 @@ async function remove() {
       导入 CSV
     </button>
   </div>
-  <div class="toolbar">
+  <div
+    class="segmented-control dataset-filters"
+    :style="{ '--segment-count': filters.length, '--selected-segment': filterIndex }"
+    role="group"
+    aria-label="数据集分类"
+  >
+    <button
+      v-for="item in filters"
+      :key="item.id"
+      type="button"
+      :aria-pressed="filter === item.id"
+      @click="filter = item.id"
+    >
+      <Icon :name="item.icon" :size="14" />
+      {{ item.label }}
+    </button>
+  </div>
+  <div class="toolbar dataset-toolbar">
     <div class="form-field search-field">
       <div class="input-icon">
         <Icon name="search" :size="14" />
         <input v-model="search" placeholder="搜索数据集…" aria-label="搜索数据集" />
       </div>
     </div>
-    <span class="small muted">{{ store.datasets.length }} 个数据集 · 全部保存在本机</span>
+    <span class="small muted" aria-live="polite">{{ filtered.length }} 个数据集</span>
   </div>
-  <div class="grid three">
+  <div v-if="!filtered.length" class="info-strip mb-16">
+    {{ query ? '当前分类下没有匹配的数据集。' : '当前分类暂无数据集。' }}
+  </div>
+  <div class="grid dataset-grid">
     <article
       v-for="d in filtered"
       :key="d.id"
       class="dataset-card"
-      :class="{ active: d.id === store.activeDatasetId }"
+      :class="{ active: d.id === store.activeDatasetId && datasetRole(d) === 'reference' }"
       @click="detailId = d.id"
     >
       <div class="flex between">
         <div class="file-tile"><Icon name="database" :size="19" /></div>
-        <div class="flex">
-          <span v-if="d.id === store.activeDatasetId" class="tag green">
+        <div class="flex dataset-card-status">
+          <span
+            v-if="d.id === store.activeDatasetId && datasetRole(d) === 'reference'"
+            class="tag green"
+          >
             <Icon name="check" :size="10" />
             当前基准
           </span>
-          <span v-else-if="d.id === store.currentDatasetId" class="tag blue">当前待检测</span>
-          <span v-else class="tag gray">
-            {{ d.source === '本地导入' ? '本地导入' : '公开示例' }}
+          <span
+            v-else-if="d.id === store.currentDatasetId && datasetRole(d) === 'current'"
+            class="tag blue"
+          >
+            当前待检测
           </span>
+          <span
+            v-else-if="d.id === 'bank-reference' && datasetRole(d) === 'reference'"
+            class="tag gray"
+          >
+            公开示例
+          </span>
+          <span v-else-if="datasetRole(d) === 'reference'" class="tag green">基准数据</span>
+          <span v-else-if="datasetRole(d) === 'current'" class="tag blue">实际数据</span>
+          <span v-else class="tag gray">未分类</span>
+          <button
+            v-if="d.id !== 'bank-reference'"
+            type="button"
+            class="icon-btn"
+            :disabled="assigning === d.id"
+            title="修改用途"
+            :aria-label="'修改用途：' + d.name"
+            @click.stop="editDatasetRole(d.id)"
+          >
+            <Icon name="pencil" :size="14" />
+          </button>
+          <button
+            v-if="d.id !== 'bank-reference'"
+            type="button"
+            class="icon-btn"
+            :disabled="assigning === d.id"
+            :title="'删除 ' + d.name"
+            :aria-label="'删除 ' + d.name"
+            @click.stop="deleteId = d.id"
+          >
+            <Icon name="trash" :size="14" />
+          </button>
         </div>
       </div>
       <h3>{{ d.name }}</h3>
@@ -161,40 +282,38 @@ async function remove() {
           数据画像
         </button>
         <button
+          v-if="datasetRole(d) === 'reference'"
           class="btn sm"
-          :disabled="d.id === store.activeDatasetId"
-          @click.stop="useDataset(d.id)"
+          :disabled="!!assigning || d.id === store.activeDatasetId"
+          @click.stop="useDataset(d)"
         >
-          设为基准
+          用作基准
         </button>
         <button
+          v-else-if="datasetRole(d) === 'current'"
           class="btn sm"
-          :disabled="d.id === store.activeDatasetId || d.id === store.currentDatasetId"
-          @click.stop="useCurrentDataset(d.id)"
+          :disabled="!!assigning || d.id === store.currentDatasetId"
+          @click.stop="useDataset(d)"
         >
-          设为待检测
-        </button>
-        <button
-          v-if="d.id !== 'bank-reference'"
-          class="icon-btn"
-          style="margin-left: auto"
-          :aria-label="'删除 ' + d.name"
-          @click.stop="deleteId = d.id"
-        >
-          <Icon name="trash" :size="14" />
+          用作待检测
         </button>
       </div>
     </article>
-    <button class="upload-zone" style="min-height: 240px" @click="openImport">
+    <button class="upload-zone dataset-upload" @click="openImport">
       <Icon name="plus" :size="26" />
-      <h3>添加基准或采集数据</h3>
+      <h3>
+        {{
+          filter === 'reference'
+            ? '添加基准数据'
+            : filter === 'current'
+              ? '添加实际数据'
+              : '添加数据集'
+        }}
+      </h3>
       <p>CSV · 最多 50,000 行 · 30 MB</p>
     </button>
   </div>
-  <div v-if="!filtered.length && search" class="info-strip mt-20">
-    没有找到“{{ search }}”相关数据集，请调整搜索条件。
-  </div>
-  <section class="panel mt-20">
+  <section v-if="filtered.some((d) => d.id === 'bank-reference')" class="panel mt-20">
     <header class="panel-head">
       <h2>
         <Icon name="book" :size="14" />
@@ -220,10 +339,10 @@ async function remove() {
   </section>
   <Modal v-if="importing" title="导入数据" @close="!uploading && (importing = false)">
     <div class="form-field mb-20">
-      <label for="import-role">导入后用途</label>
+      <label for="import-role">数据集用途</label>
       <select id="import-role" v-model="importRole" :disabled="uploading">
-        <option value="reference">设为基准数据</option>
-        <option value="current">设为待检测数据（保留当前基准）</option>
+        <option value="reference">基准数据</option>
+        <option value="current">实际数据</option>
       </select>
     </div>
     <input
@@ -260,11 +379,16 @@ async function remove() {
       <button class="btn" :disabled="uploading" @click="importing = false">关闭</button>
     </template>
   </Modal>
-  <Modal v-if="detail" :title="detail.name + ' · 数据画像'" wide @close="detailId = ''">
+  <Modal
+    v-if="detail"
+    :title="detail.name + ' · 数据画像'"
+    wide
+    @close="!saving && (detailId = '')"
+  >
     <div class="grid four mb-20">
       <div class="report-stat">
         <strong>{{ detail.profile.rows.toLocaleString() }}</strong>
-        <small>基准样本</small>
+        <small>样本数</small>
       </div>
       <div class="report-stat">
         <strong>{{ detail.profile.columns }}</strong>
@@ -279,7 +403,20 @@ async function remove() {
         <small>重复行</small>
       </div>
     </div>
-    <div class="grid two mb-20">
+    <div class="grid three mb-20 dataset-settings">
+      <div class="form-field">
+        <label for="dataset-role">数据集用途</label>
+        <select
+          id="dataset-role"
+          ref="roleSelect"
+          v-model="editRole"
+          :disabled="saving || detail.id === 'bank-reference'"
+        >
+          <option value="" disabled>未分类</option>
+          <option value="reference">基准数据</option>
+          <option value="current">实际数据</option>
+        </select>
+      </div>
       <div class="form-field">
         <label for="dataset-name">数据集名称</label>
         <input id="dataset-name" v-model="editName" maxlength="100" />
@@ -370,3 +507,56 @@ async function remove() {
     </template>
   </Modal>
 </template>
+
+<style scoped>
+.dataset-filters {
+  margin-bottom: 12px;
+}
+.dataset-filters > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.dataset-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 275px), 1fr));
+  gap: 14px;
+}
+.dataset-card {
+  min-width: 0;
+  padding: 15px;
+}
+.dataset-card-status {
+  gap: 5px;
+}
+.dataset-card h3 {
+  margin-top: 11px;
+  overflow-wrap: anywhere;
+}
+.dataset-stats {
+  gap: 18px;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.dataset-card .card-actions {
+  margin-top: 11px;
+  padding-top: 10px;
+}
+.dataset-upload {
+  min-height: 175px;
+  padding-block: 20px;
+}
+@media (max-width: 450px) {
+  .dataset-settings {
+    grid-template-columns: 1fr;
+  }
+  .dataset-filters {
+    width: 100%;
+  }
+  .dataset-filters > button {
+    gap: 4px;
+    padding-inline: 4px;
+  }
+}
+</style>

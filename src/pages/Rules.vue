@@ -56,7 +56,7 @@ const fields = [
   {
     key: 'impact' as const,
     label: 'F1 下降影响标准',
-    desc: '绝对 F1 降幅达到此值，作为阈值校准的真实影响参照。',
+    desc: 'F1 升降达到此值都提示。下降达到此值才触发告警，并作为阈值校准的依据。',
     min: 0.001,
     max: 1,
     step: 0.01,
